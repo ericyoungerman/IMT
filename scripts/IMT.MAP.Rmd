@@ -1,0 +1,72 @@
+---
+title: "IMT Map"
+author: "Eric Youngerman"
+date: "2024-05-16"
+output: html_document
+---
+
+```{r}
+
+# Set working directory
+
+setwd("/Users/ey239/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis")
+
+# Install and load required packages
+install.packages(c("ggplot2", "sf", "maps", "dplyr", "ggmap"))
+library(ggplot2)
+library(sf)
+library(maps)
+library(dplyr)
+library(ggmap)
+```
+```{r}
+# Register for Google API key
+register_google(key = "AIzaSyD5Va-phHl3SFp2YsVFiXrN42W2R8g00c0")
+```
+```{r}
+# Define and geocode the locations
+locations <- c("Aurora, NY", "Hurley, NY", "Orono, ME", "Alburgh, VT", "Arlington, WI")
+geocoded_locations <- geocode(locations)
+geocoded_locations$name <- locations
+```
+
+
+```{r}
+
+# Define the states east of the Continental Divide
+states_east_of_divide <- c( "connecticut", "delaware",  "illinois", "indiana", "kentucky", "maine", "maryland", "massachusetts", "michigan", "new hampshire", 
+ "new jersey", "new york", "ohio", 
+  "pennsylvania", "rhode island", 
+ "vermont", "virginia", "west virginia", "wisconsin")
+```
+
+```{r}
+# Get the USA map data
+usa <- map_data("state")
+usa_sf <- st_as_sf(map("state", plot = FALSE, fill = TRUE))
+```
+
+```{r}
+# Filter the map data to include only states east of the Continental Divide
+usa_east_sf <- usa_sf %>%
+  filter(ID %in% states_east_of_divide)
+```
+
+```{r}
+# Plot the map with highlighted locations
+ggplot(data = usa_east_sf) +
+  geom_sf(fill = "lightgreen") +
+  geom_point(data = geocoded_locations, 
+             aes(x = lon, y = lat), 
+             color = "red", size = 3) +
+ 
+  theme_minimal() +
+    theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),  # Remove axis titles
+        panel.grid = element_blank()) +
+  labs(title = "")
+
+
+```
+

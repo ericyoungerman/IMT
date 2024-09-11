@@ -1,0 +1,63 @@
+---
+title: "IMT.Treatment table"
+author: "Eric Youngerman"
+date: "2024-05-17"
+output: html_document
+---
+
+# Step 1: Install and load the gt package
+```{r}
+install.packages("gt")
+library(gt)
+```
+# Step 2: Create the data frame
+```{r}
+treatment_names <- c("Early Mowing", "Late Mowing", "As-Needed Mowing",  "No Mowing")
+treatment_definitions <- c( "A single mowing event between V2-V4 bean growth stages and once > 50% of weeds reach a height of eight inches. ", "A single mowing event prior to seed maturation of dominant weed species. ", "At least two mowing events, starting between V2-V4 bean growth stages once > 50% of weed reach a height of eight inches, repeated when > 50% of weeds reach a height of eight inches, and with a final mowing prior to seed maturation of dominant weed species. ", "No interrow mowing. ")
+
+
+treatments_df <- data.frame(
+  Treatment = treatment_names,
+  Definition = treatment_definitions
+)
+```
+# Step 3: Use gt to format the table
+```{r}
+table_gt <- gt(treatments_df) %>%
+  tab_header(
+    title = "Experimental Treatments",
+   
+  ) %>%
+  cols_label(
+    Treatment = "Treatment Name",
+    Definition = "Definition"
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "lightgreen"),
+      cell_text(weight = "bold")
+    ),
+    locations = cells_title(groups = "title")
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "lightgray"),
+      cell_text(align = "left")
+    ),
+    locations = cells_body()
+  
+) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(2)),
+    locations = list(
+      cells_body(),
+      cells_column_labels(),
+      cells_title(groups = "title"),
+      cells_title(groups = "subtitle")
+    )
+  )
+```
+# Step 4: Save the table as an image
+```{r}
+gtsave(table_gt, "IMTtreatmenttable.png")
+```

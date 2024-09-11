@@ -1,0 +1,624 @@
+---
+title: "IMT SEED Counds"
+author: "Eric Youngerman"
+date: "2024-05-20"
+output: html_document
+---
+
+#LIBRARY 
+```{r}
+setwd("/Users/ey239/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis")
+
+#Load packages 
+
+install.packages("patchwork")
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(viridis)
+library(rstatix)
+library(Matrix)
+library(multcomp)
+library(multcompView)
+library(ggResidpanel)
+library(tidyverse)
+library(car)
+library(glmmTMB)
+library(DHARMa)
+library(patchwork)
+library(gt)
+library(dplyr)
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+#find the value to add to x before ln(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+#LOAD and CLEAN DATA
+```{r}
+#Farmhub 
+#Load data
+at_yield.FH <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/FH_IMT_SD_RDATA.2023.xlsx", 
+    sheet = "at_yield")
+
+
+at_yield.FH<- at_yield.FH %>% rename('Mowing'= TRT)
+
+at_yield.FH$Mowing <- as.factor(at_yield.FH$Mowing)
+at_yield.FH$BLOCK <- as.factor(at_yield.FH$BLOCK)
+at_yield.FH$PLOT <- as.factor(at_yield.FH$PLOT)
+at_yield.FH$WEEK <- as.factor(at_yield.FH$WEEK)
+at_yield.FH$DATE <- as.factor(at_yield.FH$DATE)
+at_yield.FH$SEEDNUM <- as.factor(at_yield.FH$SEEDNUM)
+at_yield.FH$SEEDNUM <-as.numeric(as.character(at_yield.FH$SEEDNUM))
+summary(at_yield.FH)
+```
+```{r}
+#Cornell 
+#Load data
+at_yield.CU <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/CU_IMT_SD_RDATA_2023.xlsx", 
+    sheet = "at_yield")
+
+
+at_yield.CU<- at_yield.CU %>% rename('Mowing'= TRT)
+
+at_yield.CU$Mowing <- as.factor(at_yield.CU$Mowing)
+at_yield.CU$BLOCK <- as.factor(at_yield.CU$BLOCK)
+at_yield.CU$PLOT <- as.factor(at_yield.CU$PLOT)
+at_yield.CU$WEEK <- as.factor(at_yield.CU$WEEK)
+at_yield.CU$DATE <- as.factor(at_yield.CU$DATE)
+at_yield.CU$SEEDNUM <- as.factor(at_yield.CU$SEEDNUM)
+at_yield.CU$SEEDNUM <-as.numeric(as.character(at_yield.CU$SEEDNUM))
+summary(at_yield.CU)
+```
+```{r}
+#Vermont 
+#Load data
+at_yield.VT <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/VT_IMT_SD_RDATA.2023.xlsx", 
+    sheet = "at_yield")
+
+
+at_yield.VT<- at_yield.VT %>% rename('Mowing'= TRT)
+
+at_yield.VT$Mowing <- as.factor(at_yield.VT$Mowing)
+at_yield.VT$BLOCK <- as.factor(at_yield.VT$BLOCK)
+at_yield.VT$PLOT <- as.factor(at_yield.VT$PLOT)
+at_yield.VT$WEEK <- as.factor(at_yield.VT$WEEK)
+at_yield.VT$DATE <- as.factor(at_yield.VT$DATE)
+at_yield.VT$SEEDNUM <- as.factor(at_yield.VT$SEEDNUM)
+at_yield.VT$SEEDNUM <-as.numeric(as.character(at_yield.VT$SEEDNUM))
+summary(at_yield.VT)
+```
+```{r}
+#All Sites
+#Combine all data
+
+at_yield.ALL <- bind_rows(at_yield.FH,at_yield.CU, at_yield.VT )
+at_yield.ALL$LOC <- as.factor(at_yield.ALL$LOC)
+at_yield.ALL$Mowing <- as.factor(at_yield.ALL$Mowing)
+at_yield.ALL$BLOCK <- as.factor(at_yield.ALL$BLOCK)
+at_yield.ALL$PLOT <- as.factor(at_yield.ALL$PLOT)
+ 
+#Assuming your dataset is named at_yield.ALL
+conversion_factor <- 1333333
+
+at_yield.ALL$SEEDNUM_per_hectare <- at_yield.ALL$SEEDNUM * conversion_factor
+at_yield.ALL$SEEDNUM_per_hectare <- round(at_yield.ALL$SEEDNUM * conversion_factor)
+
+
+
+summary(at_yield.ALL)
+```
+
+```{r}
+#Farmhub
+summarized_data.FH <- at_yield.FH %>%
+  group_by(Mowing) %>%
+  summarize(total_seeds = sum(SEEDNUM, na.rm = TRUE))
+print(summarized_data.FH)
+```
+
+```{r}
+#Cornell
+summarized_data.CU <- at_yield.CU %>%
+  group_by(Mowing) %>%
+  summarize(total_seeds = sum(SEEDNUM, na.rm = TRUE))
+print(summarized_data.CU)
+```
+```{r}
+#Vermont
+summarized_data.VT <- at_yield.VT %>%
+  group_by(Mowing) %>%
+  summarize(total_seeds = sum(SEEDNUM, na.rm = TRUE))
+print(summarized_data.VT)
+
+```
+```{r}
+#All
+summarized_data.ALL <- at_yield.ALL %>%
+  group_by(Mowing) %>%
+  summarize(total_seeds = sum(SEEDNUM, na.rm = TRUE))
+print(summarized_data.ALL)
+
+```
+
+
+#MODEL TESTING
+###LMER
+####LOC Fixed, LogFullat_yieldFIX.ALL
+```{r}
+
+Fullat_yieldFIX.ALL <- lmer(SEEDNUM ~  LOC*Mowing + (1|LOC:BLOCK) +(1|LOC:BLOCK:Mowing) , data = at_yield.ALL)
+
+summary(Fullat_yieldFIX.ALL)
+
+#Three way random effect interaction has 0 variance, can be excluded from model
+
+Fullat_yieldFIX.ALL <- lmer(SEEDNUM ~  LOC*Mowing + (1|LOC:BLOCK) , data = at_yield.ALL)
+
+summary(Fullat_yieldFIX.ALL)
+
+find_logw0(at_yield.ALL$SEEDNUM)
+1
+
+LogFullat_yieldFIX.ALL <- lmer(log(SEEDNUM+1) ~  LOC*Mowing + (1|LOC:BLOCK) , data = at_yield.ALL)
+
+summary(LogFullat_yieldFIX.ALL)
+```
+####LOC random, LogFullat_yieldRan.ALL
+
+```{r}
+
+Fullat_yieldRan.ALL <- lmer(SEEDNUM ~  Mowing + (1|LOC)+ (1|LOC:BLOCK)   , data = at_yield.ALL)
+
+summary(Fullat_yieldRan.ALL)
+
+#Three way random effect interaction has 0 variance, can be exluded from model
+
+find_logw0(at_yield.ALL$SEEDNUM)
+1
+
+LogFullat_yieldRan.ALL <- lmer(log(SEEDNUM+1) ~  Mowing + (1|LOC) +(1|LOC:BLOCK) , data = at_yield.ALL)
+
+summary(LogFullat_yieldRan.ALL)
+```
+##Residuals
+```{r}
+
+##comparison of models with log transformation
+list(Fullat_yieldFIX.ALL, Fullat_yieldRan.ALL , LogFullat_yieldFIX.ALL, LogFullat_yieldRan.ALL) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# LogFullWbmMod1Fix_ALL1 and LogFullWbmMod1Ran_ALL have best residuals
+```
+##GLMER
+#### Model 1 Fullat_yieldFIX.ALL2
+
+```{r}
+Fullat_yieldFIX.ALL2 <- glmer( SEEDNUM ~  LOC*Mowing + (1|LOC:BLOCK) , data = at_yield.ALL, family = poisson())
+
+list(Fullat_yieldFIX.ALL2) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+####Model 2 Fullat_yieldFIX.ALL3
+
+```{r}
+Fullat_yieldFIX.ALL3 <- glmer(SEEDNUM ~ Mowing+LOC  +(1|LOC:BLOCK), data = at_yield.ALL, family = poisson())
+
+list(FullSdnMod1Ran_ALL1) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+####Model 3 Fullat_yieldFIX.ALL4 
+
+```{r}
+Fullat_yieldFIX.ALL4 <-  glmer(SEEDNUM ~ Mowing + (1|LOC) +(1|LOC:BLOCK), data = at_yield.ALL, family = poisson())
+
+list(Fullat_yieldFIX.ALL4) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+##Residuals
+```{r}
+
+##comparison of models 
+list(Fullat_yieldFIX.ALL2, Fullat_yieldFIX.ALL3 , Fullat_yieldFIX.ALL4 ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# LogFullWbmMod1Fix_ALL1 and LogFullWbmMod1Ran_ALL have best residuals
+```
+#####Watch tyler's talk, count data contains too many zeros resulting in overdispersion. Change to hurdle model or inflation model. r package, glmmTMB
+
+
+#ANOVA
+##LMER
+
+####LOC Fixed,  LogFullat_yieldFIX.ALL
+```{r}
+list(  LogFullat_yieldFIX.ALL) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+
+###Table
+
+```{r}
+#Make a table of anova
+# Step 1: Create a data frame from your results
+results <- data.frame(
+  Model_Term = c("LOC", "Mowing", "LOC:Mowing"),
+  df1 = c(2, 3, 6),
+  df2 = c(9, 699, 699),
+  F_ratio = c(19.019, 15.524, 3.963),
+  p_value = c("0.0006",  "<.0001", "0.0007")
+)
+
+# Step 2: Format the data frame using gt
+AnovaSEEDNUMLMERtable_gt <- gt(results) %>%
+  tab_header(
+    title = "ANOVA results", 
+    subtitle = "model = lmer(log(SEEDNUM+1) ~  LOC*Mowing + (1|LOC:BLOCK) , data = at_yield.ALL)"
+  ) %>%
+  cols_label(
+    Model_Term = "Model Term",
+    df1 = "df1",
+    df2 = "df2",
+    F_ratio = "F Ratio",
+    p_value = "p Value"
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(1)),
+    locations = cells_body()
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(2)),
+    locations = list(
+      cells_title(groups = "title"),
+      cells_title(groups = "subtitle"),
+      cells_column_labels()
+    )
+  ) %>%
+  tab_options(
+    table.border.top.width = px(2),
+    table.border.top.color = "black",
+    table.border.bottom.width = px(2),
+    table.border.bottom.color = "black"
+  )
+AnovaSEEDNUMLMERtable_gt
+
+
+```
+##GLMER
+###Loc fixed,  Fullat_yieldFIX.ALL2
+```{r}
+list(  Fullat_yieldFIX.ALL2) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+###ANOVA table
+```{r}
+#Make a table of anova
+# Step 1: Create a data frame from your results
+glm.results <- data.frame(
+  Model_Term = c("LOC", "Mowing", "LOC:Mowing"),
+  df1 = c(2, 3, 6),
+  df2 = c(Inf, Inf, Inf),
+  F_ratio = c(43.209, 57.872, 19.996),
+  Chisq = c(86.418,173.616, 119.976),
+  p_value = c("<.0001",  "<.0001", "<.0001")
+)
+
+# Step 2: Format the data frame using gt
+AnovaSEEDNUMglmtable_gt <- gt(glm.results) %>%
+  tab_header(
+    title = "ANOVA results", 
+    subtitle = " model = glmer( SEEDNUM ~  LOC*Mowing + (1|LOC:BLOCK) +(1|LOC:BLOCK:Mowing), data = at_yield.ALL, family = poisson())"
+  ) %>%
+  cols_label(
+    Model_Term = "Model Term",
+    df1 = "df1",
+    df2 = "df2",
+    F_ratio = "F Ratio",
+    p_value = "p Value"
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(1)),
+    locations = cells_body()
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(2)),
+    locations = list(
+      cells_title(groups = "title"),
+      cells_title(groups = "subtitle"),
+      cells_column_labels()
+    )
+  ) %>%
+  tab_options(
+    table.border.top.width = px(2),
+    table.border.top.color = "black",
+    table.border.bottom.width = px(2),
+    table.border.bottom.color = "black"
+  )
+AnovaSEEDNUMglmtable_gt
+
+```
+
+#MEANs Comparison
+##LMER
+###LOC Fixed, LogFullat_yieldFIX.ALL
+```{r}
+summary(LogFullat_yieldFIX.ALL)
+```
+
+```{r}
+joint_tests(LogFullat_yieldFIX.ALL)
+anova(LogFullat_yieldFIX.ALL)
+
+```
+
+```{r}
+PooledMeansFix1<-list(LogFullat_yieldFIX.ALL) %>%
+setNames(c("All Sites"))%>%
+ #map(emmeans, pairwise~LOC, type = "response") 
+ #map(emmeans, pairwise ~ Mowing, type = "response") 
+ #map(emmeans, pairwise~Weeds, type = "response") 
+ map(emmeans, pairwise ~Mowing|LOC, type = "response") 
+ #map(emmeans, pairwise~Weeds|LOC, type = "response") 
+ # map(emmeans, pairwise~Mowing|Weeds, type = "response") 
+PooledMeansFix1
+```
+##GLMER
+### Fullat_yieldFIX.ALL2
+```{r}
+summary(Fullat_yieldFIX.ALL2)
+```
+
+```{r}
+joint_tests(Fullat_yieldFIX.ALL2)
+anova(Fullat_yieldFIX.ALL2)
+
+```
+
+```{r}
+PooledMeansFix1<-list(Fullat_yieldFIX.ALL2) %>%
+setNames(c("All Sites"))%>%
+ #map(emmeans, pairwise~LOC, type = "response") 
+ #map(emmeans, pairwise ~ Mowing, type = "response") 
+ #map(emmeans, pairwise~Weeds, type = "response") 
+ map(emmeans, pairwise ~Mowing|LOC, type = "response") 
+ #map(emmeans, pairwise~Weeds|LOC, type = "response") 
+ # map(emmeans, pairwise~Mowing|Weeds, type = "response") 
+PooledMeansFix1
+```
+#FIGURES
+##LMER, LogFullat_yieldFIX.ALL
+
+
+```{r}
+summary(LogFullat_yieldFIX.ALL)
+```
+
+```{r}
+joint_tests(LogFullat_yieldFIX.ALL)
+```
+####CLD
+```{r}
+
+#Fisher's method for comparing means
+#Mowing
+cld.LogFullat_yieldFIX.ALL <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|LOC
+cld.LogFullat_yieldFIX.ALL1 <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|LOC GLM
+cld.Fullat_yieldFIX.ALL1 <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+```
+
+####Mowing (Significant)
+```{r}
+cld.LogFullat_yieldFIX.ALL <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+#Graphing
+
+#png("SEEDNUM.Mow.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullat_yieldFIX.ALL %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing)) +  
+  #facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY",   "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=response +(SE+0.09) )) +
+  labs(x="Timing of Mowing", y=expression("Seeds per trap" ~ (0.0078~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing",  "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.1)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+#dev.off()
+```
+####Mowing|LOC (Significant)
+```{r}
+
+#Mowing|LOC
+cld.LogFullat_yieldFIX.ALL1 <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+
+#png("SEEDNUM.Mow.LOC.png", res = 300, units = "in", width = 11.5, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullat_yieldFIX.ALL1 %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing)) +  
+  facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "VT" = "Alburgh, VT"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=response +(SE+1) )) +
+  labs(x="Timing of Mowing", y=expression("Weed seed density" ~ (seeds~0.0078~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+#dev.off()
+```
+```{r}
+#Mowing|LOC GLM
+cld.Fullat_yieldFIX.ALL1 <-cld(emmeans(Fullat_yieldFIX.ALL, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+
+png("SEEDNUM.Mow.LOC.GLM.png", res = 300, units = "in", width = 11.5, height = 4)
+#left_join(M_SW.ALL,
+cld.Fullat_yieldFIX.ALL1 %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing)) +  
+  facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "VT" = "Alburgh, VT"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=emmean +(SE+1) )) +
+  labs(x="Timing of Mowing", y=expression("Seeds per trap" ~ (0.0078~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+dev.off()
+```
+#GLM, Fullat_yieldFIX.ALL2
+
+```{r}
+summary(Fullat_yieldFIX.ALL2)
+```
+
+```{r}
+joint_tests(Fullat_yieldFIX.ALL2)
+```
+####CLD
+```{r}
+
+#Fisher's method for comparing means
+#Mowing
+cld.Fullat_yieldGlmFIX1.ALL <-cld(emmeans(Fullat_yieldFIX.ALL2, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|LOC
+cld.Fullat_yieldGlmFIX1.ALL <-cld(emmeans(Fullat_yieldFIX.ALL2, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|LOC GLM
+cld.Fullat_yieldFIX.ALL1 <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+```
+
+####Mowing (Significant)
+```{r}
+cld.LogFullat_yieldFIX.ALL <-cld(emmeans(LogFullat_yieldFIX.ALL, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+#Graphing
+
+#png("SEEDNUM.Mow.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullat_yieldFIX.ALL %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing)) +  
+  #facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY",   "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=response +(SE+0.09) )) +
+  labs(x="Timing of Mowing", y=expression("Seeds per trap" ~ (0.0078~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing",  "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.1)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+#dev.off()
+```
+####Mowing|LOC (Significant)
+```{r}
+
+#Mowing|LOC
+cld.Fullat_yieldGlmFIX1.ALL <-cld(emmeans(Fullat_yieldFIX.ALL2, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+
+#png("SEEDNUM.GLM.Mow.LOC.TRAP.png", res = 300, units = "in", width = 11.5, height = 4)
+#left_join(M_SW.ALL,
+cld.Fullat_yieldGlmFIX1.ALL %>% 
+ggplot(.,aes(Mowing, rate, fill=Mowing)) +  
+  facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "VT" = "Alburgh, VT"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=rate-SE, ymax=rate+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=rate +(SE+2) )) +
+  labs(x="Timing of Mowing", y=expression("Weed seed density" ~ (seeds~0.0078~m^{-2}))) +
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), labels = scales::comma) +
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+#dev.off()
+```
+```{r}
+#Mowing|LOC GLM
+cld.Fullat_yieldFIX.ALL1 <-cld(emmeans(Fullat_yieldFIX.ALL, ~ Mowing|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+
+png("SEEDNUM.Mow.LOC.GLM.png", res = 300, units = "in", width = 11.5, height = 4)
+#left_join(M_SW.ALL,
+cld.Fullat_yieldFIX.ALL1 %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing)) +  
+  facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "VT" = "Alburgh, VT"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=emmean +(SE+100) )) +
+  labs(x="Timing of Mowing", y=expression("Seeds per hectare" ))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+dev.off()
+```

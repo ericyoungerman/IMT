@@ -1,0 +1,1288 @@
+---
+title: "Imt.Bean Yield"
+author: "Eric Youngerman"
+date: "2024-05-14"
+output: html_document
+---
+
+#LIBRARY 
+```{r}
+setwd("/Users/ey239/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis")
+
+#Load packages 
+
+install.packages("patchwork")
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(viridis)
+library(rstatix)
+library(Matrix)
+library(multcomp)
+library(multcompView)
+library(ggResidpanel)
+library(tidyverse)
+library(car)
+library(glmmTMB)
+library(DHARMa)
+library(patchwork)
+library(dplyr)
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+#find the value to add to x before ln(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+#LOAD and CLEAN DATA
+
+```{r}
+#Load data
+#Farmhub
+M_SW.FH <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/FH_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+
+M_SW.FH<- M_SW.FH %>% rename('Mowing'= TRT)
+M_SW.FH<- M_SW.FH %>% rename('Weeds'= MICROPLOT)
+
+
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+M_SW.FH$Mowing <- as.factor(M_SW.FH$Mowing)
+M_SW.FH$BLOCK <- as.factor(M_SW.FH$BLOCK)
+M_SW.FH$PLOT <- as.factor(M_SW.FH$PLOT)
+M_SW.FH$Weeds <- as.factor(M_SW.FH$Weeds)
+
+#Cornell 
+#Load data
+M_SW.CU <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/CU_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+
+M_SW.CU<- M_SW.CU %>% rename('Mowing'= TRT)
+M_SW.CU<- M_SW.CU %>% rename('Weeds'= MICROPLOT)
+
+M_SW.CU$Mowing <- as.factor(M_SW.CU$Mowing)
+M_SW.CU$BLOCK <- as.factor(M_SW.CU$BLOCK)
+M_SW.CU$PLOT <- as.factor(M_SW.CU$PLOT)
+M_SW.CU$Weeds <- as.factor(M_SW.CU$Weeds)
+
+#Vermont
+#Load data
+M_SW.VT <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/VT_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+
+M_SW.VT<- M_SW.VT %>% rename('Mowing'= TRT)
+M_SW.VT<- M_SW.VT %>% rename('Weeds'= MICROPLOT)
+
+M_SW.VT$Mowing <- as.factor(M_SW.VT$Mowing)
+M_SW.VT$BLOCK <- as.factor(M_SW.VT$BLOCK)
+M_SW.VT$PLOT <- as.factor(M_SW.VT$PLOT)
+M_SW.VT$Weeds <- as.factor(M_SW.VT$Weeds)
+
+#Wisconsin
+#Load data
+M_SW.WI <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/WI_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+
+M_SW.WI<- M_SW.WI %>% rename('Mowing'= TRT)
+M_SW.WI<- M_SW.WI %>% rename('Weeds'= MICROPLOT)
+
+M_SW.WI$Mowing <- as.factor(M_SW.WI$Mowing)
+M_SW.WI$BLOCK <- as.factor(M_SW.WI$BLOCK)
+M_SW.WI$PLOT <- as.factor(M_SW.WI$PLOT)
+M_SW.WI$Weeds <- as.factor(M_SW.WI$Weeds)
+
+#MAINE
+#Load data
+M_SW.ME <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/ME_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+
+M_SW.ME<- M_SW.ME %>% rename('Mowing'= TRT)
+M_SW.ME<- M_SW.ME %>% rename('Weeds'= MICROPLOT)
+
+M_SW.ME$Mowing <- as.factor(M_SW.ME$Mowing)
+M_SW.ME$BLOCK <- as.factor(M_SW.ME$BLOCK)
+M_SW.ME$PLOT <- as.factor(M_SW.ME$PLOT)
+M_SW.ME$Weeds <- as.factor(M_SW.ME$Weeds)
+
+#Combine all data
+
+M_SW.ALL <- bind_rows(M_SW.CU, M_SW.FH, M_SW.VT, M_SW.WI, M_SW.ME)
+
+M_SW.ALL$Mowing <- as.factor(M_SW.ALL$Mowing)
+M_SW.ALL$BLOCK <- as.factor(M_SW.ALL$BLOCK)
+M_SW.ALL$PLOT <- as.factor(M_SW.ALL$PLOT)
+M_SW.ALL$Weeds <- as.factor(M_SW.ALL$Weeds)
+
+#Combine all sites, No Maine
+
+M_SW.ALLNM <- bind_rows(M_SW.CU, M_SW.FH, M_SW.VT, M_SW.WI)
+
+M_SW.ALLNM$Mowing <- as.factor(M_SW.ALLNM$Mowing)
+M_SW.ALLNM$BLOCK <- as.factor(M_SW.ALLNM$BLOCK)
+M_SW.ALLNM$PLOT <- as.factor(M_SW.ALLNM$PLOT)
+M_SW.ALLNM$Weeds <- as.factor(M_SW.ALLNM$Weeds)
+
+```
+
+#LEVENE'S TEST
+```{r}
+leveneTest((BEANYD3) ~ LOC, data = M_SW.ALL)
+#Levene's test was significant so sites need to be analyzed separately
+# 0.07759 
+
+```
+
+#MODEL TESTING
+##Pooled sites 
+###LOC Fixed, FullBydMod1Fix_ALL
+
+```{r}
+
+FullBydMod1Fix_ALL <- lmer(BEANYD3 ~  LOC*Mowing*Weeds + (1|LOC:BLOCK) +(1|LOC:BLOCK:Mowing) , data = M_SW.ALL)
+
+summary(FullBydMod1Fix_ALL)
+
+#Three way random effect interaction has variance,so we weill include it here.
+
+
+#find_logw0(M_SW.ALL$BEANYD3) no zeros in yield, natural log can be taken
+#0.3678794
+
+LogFullWbmMod1Fix_ALL1 <- lmer(log(BEANYD3) ~  LOC*Mowing*Weeds + (1|LOC:BLOCK) +(1|LOC:BLOCK:Mowing), data = M_SW.ALL)
+
+summary(LogFullWbmMod1Fix_ALL1)
+```
+###LOC random,LogFullBydMod1Ran_ALL 
+```{r}
+#####LOC is Random
+ 
+FullBydMod1Ran_ALL <- lmer(BEANYD3 ~  Mowing*Weeds +(1+Mowing+Weeds+Mowing:Weeds|LOC) +(1|LOC)+ (1|LOC:BLOCK) , data = M_SW.ALL)
+
+summary(FullWbmMod1Ran_ALL)
+
+#Data sets need to be transformed
+
+#find_logw0(M_SW.ALL$WBM1)
+#0.3678794
+
+
+LogFullBydMod1Ran_ALL <- lmer(log(BEANYD3) ~  Mowing*Weeds +(1+Mowing+Weeds+Mowing:Weeds|LOC) +(1|LOC)+ (1|LOC:BLOCK) , data = M_SW.ALL)
+
+summary(LogFullWbmMod1Ran_ALL)
+```
+###Residuals
+```{r}
+
+##comparison of models with log transformation
+list(FullBydMod1Fix_ALL , FullWbmMod1Ran_ALL, LogFullWbmMod1Fix_ALL1, LogFullWbmMod1Ran_ALL ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# LogFullWbmMod1Fix_ALL1 and LogFullWbmMod1Ran_ALL have best residuals
+```
+```{r}
+
+#lmer
+
+#This is a full fitted model with location, mowing event, and weediness as fixed effects
+#It takes into account the randomness of block in location and mowing in block in location
+
+FullBydMod1Fix_ALL <- lmer(BEANYD3 ~  LOC*Mowing*Weeds + (1|LOC:BLOCK)+  (1|LOC:BLOCK:Mowing)  , data = M_SW.ALL)
+
+#This is a full fitted model with mowing event and weediness as fixed effects, Location is random effect
+# It accounts for the correlation between observations within the same LOC, observations within the same block within the same location, and  observations within the same mowing treatment, within the same block, within the same location.
+
+FullBydMod1Ran_ALL <- lmer(BEANYD3 ~  Mowing*Weeds +(1|LOC)+ (1|LOC:BLOCK)+  + (1|LOC:BLOCK:Mowing)  , data = M_SW.ALL)
+
+resid_panel(FullBydMod1Fix_ALL)
+resid_panel(FullBydMod1Ran_ALL)
+
+#Data sets need to be transformed
+
+find_logw0(M_SW.ALL$BEANYD3)
+#7.389056
+
+#LOC is Fixed
+LogFullBydMod1Fix_ALL <- lmer(log(BEANYD3 + 7.389056) ~ LOC*Mowing*Weeds + (1|LOC:BLOCK)+  (1|LOC:BLOCK:Mowing)  , data = M_SW.ALL)
+
+
+#LOC is Random
+LogFullBydMod1Ran_ALL <- lmer(log(BEANYD3+ 7.389056) ~  Mowing*Weeds + (1|LOC) + (1|LOC:BLOCK)+ (1|LOC:BLOCK:Mowing)  , data = M_SW.ALL)
+
+##comparison of models with log transformation
+list(FullBydMod1Fix_ALL , FullBydMod1Ran_ALL,LogFullBydMod1Fix_ALL, LogFullBydMod1Ran_ALL  ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# FullBydMod1Fix_ALL has better residuals
+
+```
+
+## Farm hub, FullBydMod1Fix_FH
+
+```{r}
+
+#lmer
+
+#Block is Fixed, 
+#Block was included in all models as a fixed factor because blocks were used to control the different field conditions across sections, and thus to reduce variance between eu's
+
+FullBydMod1Fix_FH <- lmer(BEANYD3 ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.FH)
+
+#Block is Random
+FullBydMod1Ran_FH <- lmer(BEANYD3 ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.FH)
+
+#find_logw0(M_SW.FH$BEANYD3)
+# = 1096.633
+
+#Logged, Block is Fixed
+LogFullBydMod1Fix_FH <- lmer(log(BEANYD3) ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.FH)
+
+#Logged, Block is Random
+LogFullBydMod1Ran_FH <- lmer(log(BEANYD3) ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.FH)
+
+##comparison of models with and without log transformation
+list(FullBydMod1Fix_FH , FullBydMod1Ran_FH, LogFullBydMod1Fix_FH,LogFullBydMod1Ran_FH ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# LogFullWbmMod1Fix_FH has better residuals
+```
+##Cornell,FullBydMod1Fix_CU
+```{r}
+
+#lmer
+#Block is Fixed, 
+#Block was included in all models as a fixed factor because blocks were used to control the different field conditions across sections, and thus to reduce variance between eu's
+
+FullBydMod1Fix_CU <- lmer(BEANYD3 ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.CU)
+
+#Block is Random
+FullBydMod1Ran_CU <- lmer(BEANYD3 ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.CU)
+
+#find_logw0(M_SW.CU$WBM1)
+# = 7.389056
+
+#Logged, Block is Fixed
+LogFullBydMod1Fix_CU <- lmer(log(BEANYD3) ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.CU)
+
+#Logged, Block is Random
+LogFullBydMod1Ran_CU <- lmer(log(BEANYD3) ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.CU)
+
+##comparison of models with and without log transformation
+list(FullBydMod1Fix_CU , FullBydMod1Ran_CU, LogFullBydMod1Fix_CU,LogFullBydMod1Ran_CU ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# FullBydMod1Fix_CU has better residuals
+
+```
+
+##Vermont, FullBydMod1Fix_VT 
+
+```{r}
+#lmer
+#Block is Fixed, 
+#Block was included in all models as a fixed factor because blocks were used to control the different field conditions across sections, and thus to reduce variance between eu's
+
+FullBydMod1Fix_VT <- lmer(BEANYD3 ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.VT)
+
+#Block is Random
+FullBydMod1Ran_VT <- lmer(BEANYD3 ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.VT)
+
+#find_logw0(M_SW.VT$WBM1)
+# =  0.3678794
+
+#Logged, Block is Fixed
+LogFullBydMod1Fix_VT<- lmer(log(BEANYD3) ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.VT)
+
+#Logged, Block is Random
+LogFullBydMod1Ran_VT <- lmer(log(BEANYD3) ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.VT)
+
+##comparison of models with and without log transformation
+list(FullBydMod1Fix_VT , FullBydMod1Ran_VT, LogFullBydMod1Fix_VT,LogFullBydMod1Ran_VT ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# FullBydMod1Fix_VT  has better residuals
+```
+##Wisconsin, 
+```{r}
+
+#lmer
+#Block is Fixed, 
+#Block was included in all models as a fixed factor because blocks were used to control the different field conditions across sections, and thus to reduce variance between eu's
+
+FullWbmMod1Fix_WI <- lmer(WBM1 ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.WI)
+
+#Block is Random
+FullWbmMod1Ran_WI <- lmer(WBM1 ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.WI)
+
+find_logw0(M_SW.WI$WBM1)
+# =  1
+
+#Logged, Block is Fixed
+LogFullWbmMod1Fix_WI<- lmer(log(WBM1 + 1) ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.WI)
+
+#Logged, Block is Random
+LogFullWbmMod1Ran_WI <- lmer(log(WBM1 +  1) ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.WI)
+
+##comparison of models with and without log transformation
+list(FullWbmMod1Fix_WI , FullWbmMod1Ran_WI, LogFullWbmMod1Fix_WI,LogFullWbmMod1Ran_WI ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# FullWbmMod1Fix_WI has better residuals
+
+```
+##Maine, 
+```{r}
+#lmer
+#Block is Fixed, 
+#Block was included in all models as a fixed factor because blocks were used to control the different field conditions across sections, and thus to reduce variance between eu's
+
+FullWbmMod1Fix_ME <- lmer(WBM1 ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.ME)
+
+#Block is Random
+FullWbmMod1Ran_ME <- lmer(WBM1 ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.ME)
+
+find_logw0(M_SW.ME$WBM1)
+# =  7.389056
+
+#Logged, Block is Fixed
+LogFullWbmMod1Fix_ME<- lmer(log(WBM1 + 7.389056) ~ BLOCK + Mowing*Weeds + (1|BLOCK:Mowing)  , data = M_SW.ME)
+
+#Logged, Block is Random
+LogFullWbmMod1Ran_ME <- lmer(log(WBM1 + 7.389056) ~ Mowing*Weeds + (1|BLOCK) + (1|BLOCK:Mowing)  , data = M_SW.ME)
+
+##comparison of models with and without log transformation
+list(FullWbmMod1Fix_ME , FullWbmMod1Ran_ME, LogFullWbmMod1Fix_ME,LogFullWbmMod1Ran_ME ) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+# LogFullWbmMod1Fix_ME has better residuals
+
+```
+#ANOVA
+##Pooled Sites
+###LOC Fixed,  FullBydMod1Fix_ALL
+```{r}
+list(  FullBydMod1Fix_ALL) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+
+###ANOVA table
+```{r}
+#Make a table of anova
+# Step 1: Create a data frame from your results
+results <- data.frame(
+  Model_Term = c("LOC", "Mowing", "Weeds", "LOC:Mowing", "LOC:Weeds", "Mowing:Weeds", "LOC:Mowing:Weeds"),
+  df1 = c(4, 3, 1, 12, 4, 3, 12),
+  df2 = c(15, 45, 60, 45, 60, 60, 60),
+  F_ratio = c(15.661, 1.453, 78.417, 3.627, 3.796, 0.898, 1.129),
+  p_value = c("<.0001",  0.2399, "<.0001", 0.0008,  0.0081, 0.4474, 0.3549)
+)
+
+# Step 2: Format the data frame using gt
+AnovaBEANYDtable_gt <- gt(results) %>%
+  tab_header(
+    title = "ANOVA results", 
+    subtitle = "lmer(BEANYD3 ~  LOC*Mowing*Weeds + (1|LOC:BLOCK) +(1|LOC:BLOCK:Mowing) , data = M_SW.ALL)"
+  ) %>%
+  cols_label(
+    Model_Term = "Model Term",
+    df1 = "df1",
+    df2 = "df2",
+    F_ratio = "F Ratio",
+    p_value = "p Value"
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(1)),
+    locations = cells_body()
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(2)),
+    locations = list(
+      cells_title(groups = "title"),
+      cells_title(groups = "subtitle"),
+      cells_column_labels()
+    )
+  ) %>%
+  tab_options(
+    table.border.top.width = px(2),
+    table.border.top.color = "black",
+    table.border.bottom.width = px(2),
+    table.border.bottom.color = "black"
+  )
+AnovaBEANYDtable_gt
+
+# Step 3: Save the table as an image
+gtsave(AnovaWB1table_gt, "Anova table weed biomass")
+```
+```{r}
+list(FullBydMod1Fix_ALL) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+###LOC Random, LogFullBydMod1Ran_ALL 
+```{r}
+list(LogFullBydMod1Ran_ALL ) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+###Anova table
+```{r}
+#Make a table of anova
+# Step 1: Create a data frame from your results
+results1 <- data.frame(
+  Model_Term = c("Mowing", "Weeds", "Mowing:Weeds"),
+  df1 = c(3, 1, 3),
+  df2 = c(4, 4, 4),
+  F_ratio = c(0.627,  3.454 , 0.358),
+  p_value = c(0.6346,  0.1366,  0.7874)
+)
+
+
+# Step 2: Format the data frame using gt
+AnovaByd2table_gt <- gt(results1) %>%
+  tab_header(
+    title = "ANOVA results", 
+    subtitle = "Model = LogFullBydMod1Ran_ALL <- lmer(log(BEANYD3) ~  Mowing*Weeds +(1+Mowing+Weeds+Mowing:Weeds|LOC) +(1|LOC)+ (1|LOC:BLOCK) , data = M_SW.ALL)"
+  ) %>%
+  cols_label(
+    Model_Term = "Model Term",
+    df1 = "df1",
+    df2 = "df2",
+    F_ratio = "F Ratio",
+    p_value = "p Value"
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(1)),
+    locations = cells_body()
+  ) %>%
+  tab_style(
+    style = cell_borders(sides = "all", color = "black", weight = px(2)),
+    locations = list(
+      cells_title(groups = "title"),
+      cells_title(groups = "subtitle"),
+      cells_column_labels()
+    )
+  ) %>%
+  tab_options(
+    table.border.top.width = px(2),
+    table.border.top.color = "black",
+    table.border.bottom.width = px(2),
+    table.border.bottom.color = "black"
+  )
+AnovaByd2table_gt
+
+# Step 3: Save the table as an image
+gtsave(AnovaWB2table_gt, "Anova table weed biomass2.png")
+```
+###LOC Random
+```{r}
+list(LogFullWMod1Ran_ALL) %>%
+setNames(c("All Sites"))%>%
+  lapply(joint_tests)
+```
+
+##Separated Sites, 
+###BLOCK Fixed
+```{r}
+list(LogFullWbmMod1Fix_FH, LogFullWbmMod1Fix_CU, LogFullWbmMod1Fix_VT, LogFullWbmMod1Fix_WI,LogFullWbmMod1Fix_ME) %>%
+setNames(c("Farm hub", "Cornell", "Vermont", "Wisconsin", "Maine"))%>%
+  lapply(joint_tests)
+joint_tests(LogFullWbmMod1Fix_ME)
+
+```
+#MEANs Comparison
+##Pooled Sites
+###LOC Fixed, FullBydMod1Fix_ALL
+```{r}
+summary(FullBydMod1Fix_ALL)
+```
+
+```{r}
+joint_tests(FullBydMod1Fix_ALL)
+```
+
+```{r}
+PooledMeansFix1<-list(FullBydMod1Fix_ALL) %>%
+setNames(c("All Sites"))%>%
+ #map(emmeans, pairwise~LOC, type = "response") 
+ #map(emmeans, pairwise~Mowing, type = "response") 
+ map(emmeans, pairwise~Weeds, type = "response") 
+ #map(emmeans, pairwise ~Mowing|LOC, type = "response") 
+ #map(emmeans, pairwise~Weeds|LOC, type = "response") 
+ # map(emmeans, pairwise~Mowing|Weeds, type = "response") 
+PooledMeansFix1
+```
+###LOC Random, LogFullBydMod1Ran_ALL
+```{r}
+summary(LogFullBydMod1Ran_ALL)
+```
+
+```{r}
+joint_tests(LogFullBydMod1Ran_ALL)
+```
+
+```{r}
+PooledMeansRan1<-list(LogFullBydMod1Ran_ALL) %>%
+setNames(c("All Sites"))%>%
+ #map(emmeans, pairwise~ Mowing , type = "response") 
+ map(emmeans, pairwise~ Weeds , type = "response") 
+PooledMeansRan1
+```
+
+##Individual Sites
+###BLOCK Fixed
+```{r}
+
+SeparateMeans <- list(LogFullWbmMod1Fix_FH, LogFullWbmMod1Fix_CU, LogFullWbmMod1Fix_VT, LogFullWbmMod1Fix_WI,LogFullWbmMod1Fix_ME) %>%
+setNames(c("Farm hub", "Cornell", "Vermont", "Wisconsin", "Maine"))%>%
+  #map(emmeans, pairwise~ Weeds | Mowing , type = "response") 
+
+ map(emmeans, pairwise~ Mowing| Weeds , type = "response") 
+SeparateMeans
+```
+
+#FIGURES
+##Pooled Sites
+###LOC Fixed, FullBydMod1Fix_ALL
+####CLD
+```{r}
+
+#Fisher's method for comparing means
+#Mowing
+cld.FullBydMod1Fix_ALL <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|LOC
+cld.FullBydMod1Fix_ALL1 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing|LOC,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|Weeds
+cld.FullBydMod1Fix_ALL2 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing|Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Mowing|Weeds|LOC
+cld.FullBydMod1Fix_ALL3 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing|Weeds|LOC,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Weeds
+cld.FullBydMod1Fix_ALL4 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Weeds, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Weeds|LOC
+cld.FullBydMod1Fix_ALL5 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Weeds|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+```
+
+
+
+####Mowing (Not Significant)
+```{r}
+cld.FullBydMod1Fix_ALL <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+#Graphing
+
+png("BYD.Mow.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Fix_ALL %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing)) +  
+  #facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY",   "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=emmean +(SE+80) )) +
+  labs(x="Timing of Mowing", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing",  "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+dev.off()
+```
+####Mowing|LOC (Significant)
+```{r}
+
+#Mowing|LOC
+cld.FullBydMod1Fix_ALL1 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing|LOC,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+
+png("BYD.Mow.LOC.png", res = 300, units = "in", width = 11.5, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Fix_ALL1 %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing)) +  
+  facet_wrap(~LOC,ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY",   "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=emmean +(SE+125) )) +
+  labs(x="Timing of Mowing", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+
+dev.off()
+
+```
+####Mowing|Weeds (Significant)
+```{r}
+#Mowing|Weeds
+cld.FullBydMod1Fix_ALL2 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing|Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+
+png("BYD.Mow.Weeds.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Fix_ALL2 %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing))+  facet_wrap(~Weeds, labeller = labeller(Weeds = c("M" = "Ambient Weeds", "SW" = "Surrogate Weeds" ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean +(SE+100))) +
+  labs(x="Timing of Mowing", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing",  "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+####Mowing|Weeds|LOC (Not signficant)
+```{r}
+#Mowing|Weeds|LOC
+cld.FullBydMod1Fix_ALL3 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Mowing|Weeds|LOC,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+#Graphing
+
+#png("BYD.Mow.Weeds.LOC.png", res = 300, units = "in", width = 11, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Fix_ALL3 %>% 
+ggplot(aes(Mowing, emmean, fill=Mowing)) +  
+  facet_grid(Weeds ~ LOC, labeller = labeller(
+    LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME" = "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"),
+    Weeds = c("M" = "Ambient Weeds", "SW" = "Surrogate Weeds")
+  )) +
+              
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), size=6.5, y = emmean +(SE+280)))+
+  labs(x="Timing of Mowing", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing","Early\nmowing","Late\nmowing",  "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+#dev.off()
+
+```
+####Weeds (Significant)
+```{r}
+#Weeds
+cld.FullBydMod1Fix_ALL4 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Weeds, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+```
+```{r}
+
+png("BYD.Weeds.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Fix_ALL4%>% 
+ggplot(.,aes(Weeds, emmean, fill=Weeds))+  #facet_wrap(~LOC, ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5,y=emmean +(SE+80) )) +
+labs(x="Weed Type", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+
+####Weeds|LOC (Significant)
+```{r}
+
+#Weeds|LOC
+cld.FullBydMod1Fix_ALL5 <-cld(emmeans(FullBydMod1Fix_ALL, ~ Weeds|LOC, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+```
+```{r}
+
+#png("BYD.Weeds.LOC.png", res = 300, units = "in", width = 11, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Fix_ALL5 %>% 
+ggplot(.,aes(Weeds, emmean, fill=Weeds))+  facet_wrap(~LOC, ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean+(SE+100))) +
+  labs(x="Weed Type", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.2)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+#dev.off()
+```
+
+
+###LOC Random
+```{r}
+
+#Fisher's method for comparing means, designated by b at end of  name
+cld.FullBydMod1Ran_ALLb <-cld(emmeans(FullBydMod1Ran_ALL, ~ Mowing, type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+cld.FullBydMod1Ran_ALL1b <-cld(emmeans(FullBydMod1Ran_ALL, ~ Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+```
+####Mowing NS
+```{r}
+
+#Graphing
+#Using Fisher's method for comparing means with pooled site data and location as a fixed effect, Interaction between location and weeds is significant
+
+png("FullBydMod1Ran_ALL.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Ran_ALLb %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing))+  #facet_wrap(~LOC, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean +(SE+80))) +
+  labs(x="Timing of Mowing", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+####Weeds S
+```{r}
+
+png("FullBydMod1Ran_ALL1b.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+cld.FullBydMod1Ran_ALL1b %>% 
+ggplot(.,aes(Weeds, emmean, fill=Weeds))+  #facet_wrap(~LOC, ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean+(SE+80))) +
+  labs(x="Weed level", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+
+##Individual Sites
+###Farm hub 
+
+```{r}
+joint_tests(FullBydMod1Fix_FH)
+```
+
+```{r}
+
+
+
+#Fisher's method for comparing means
+#Mowing (Not significant)
+cld.FullBydMod1Fix_FHb <-cld(emmeans(FullBydMod1Fix_FH, ~ Mowing,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Weeds (Not Significant)
+cld.FullBydMod1Fix_FH1b <-cld(emmeans(FullBydMod1Fix_FH, ~ Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+
+#Graphing
+#Using Fisher's method for comparing means
+```
+####Mowing NS
+```{r}
+png("FullBydMod1Fix_FHb.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.FH,
+ cld.FullBydMod1Fix_FHb %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing))+
+  #stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean +(SE+80))) +labs(x="Treatment", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+####Weeds NS
+```{r}
+
+png("FullBydMod1Fix_FH1b.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+ cld.FullBydMod1Fix_FH1b %>% 
+ggplot(.,aes(Weeds, emmean, fill=Weeds))+  #facet_wrap(~LOC, ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean+(SE+80))) +
+  labs(x="Weed level", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+```
+
+###Cornell
+
+```{r}
+joint_tests(FullBydMod1Fix_CU)
+```
+
+```{r}
+
+
+
+#Fisher's method for comparing means
+#Mowing (Not significant)
+cld.FullBydMod1Fix_CUb <-cld(emmeans(FullBydMod1Fix_CU, ~ Mowing,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Weeds (Significant)
+cld.FullBydMod1Fix_CU1b <-cld(emmeans(FullBydMod1Fix_CU, ~ Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+
+#Graphing
+#Using Fisher's method for comparing means
+```
+####Mowing NS
+```{r}
+png("FullBydMod1Fix_CUb.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.FH,
+ cld.FullBydMod1Fix_CUb %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing))+
+  #stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean +(SE+80))) +labs(x="Treatment", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+ 
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+####Weeds S
+```{r}
+
+#png("FullBydMod1Fix_CU1b.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+ cld.FullBydMod1Fix_CU1b %>% 
+ggplot(.,aes(Weeds, emmean, fill=Weeds))+  #facet_wrap(~LOC, ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean+(SE+85))) +
+  labs(x="Weed level", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+#dev.off()
+
+```
+
+###Vermont
+
+```{r}
+joint_tests(FullBydMod1Fix_VT )
+```
+
+```{r}
+
+
+
+#Fisher's method for comparing means
+#Mowing (Significant)
+cld.FullBydMod1Fix_VTb <-cld(emmeans(FullBydMod1Fix_VT, ~ Mowing,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Weeds (Significant)
+cld.FullBydMod1Fix_VT1b <-cld(emmeans(FullBydMod1Fix_VT, ~ Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+
+
+#Graphing
+#Using Fisher's method for comparing means
+```
+####Mowing S
+```{r}
+#png("FullBydMod1Fix_VTb.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.FH,
+ cld.FullBydMod1Fix_VTb %>% 
+ggplot(.,aes(Mowing, emmean, fill=Mowing))+
+  #stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean +(SE+100))) +labs(x="Treatment", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+#dev.off()
+
+
+```
+####Weeds S
+```{r}
+
+png("FullBydMod1Fix_VT1b.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+ cld.FullBydMod1Fix_VT1b %>% 
+ggplot(.,aes(Weeds, emmean, fill=Weeds))+  #facet_wrap(~LOC, ncol= 5, labeller = labeller(LOC = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME"= "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"  ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=emmean-SE, ymax=emmean+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = emmean+(SE+85))) +
+  labs(x="Weed level", y=expression("Dry bean yield" ~ (kg ~ ha^{-1})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+
+###Wisconsin 
+```{r}
+
+
+#Fisher's method for comparing means
+cld.LogFullWbmMod1Fix_WIb <-cld(emmeans(LogFullWbmMod1Fix_WI, ~ Mowing,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+cld.LogFullWbmMod1Fix_WI1b <-cld(emmeans(LogFullWbmMod1Fix_WI, ~ Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+cld.LogFullWbmMod1Fix_WI2b <-cld(emmeans(LogFullWbmMod1Fix_WI, ~ Mowing|Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+#Using Fisher's method for comparing means
+```
+####Mowing S
+```{r}
+png("LogFullWbmMod1Fix_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.FH,
+ cld.LogFullWbmMod1Fix_WIb %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  #geom_bar(stat="identity", 
+           #position=position_dodge()) + 
+ # geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                # position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = response +(SE+1))) +labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+```
+####Weeds S
+```{r}
+png("cld.LogFullWbmMod1_WI1b.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullWbmMod1Fix_WI1b %>% 
+ggplot(.,aes(Weeds, response, fill=Weeds))+  
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = response+(SE+4))) +
+  labs(x="Weed level", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+```
+####Mowing|Weeds NS
+```{r}
+
+#Graphing
+
+#png("LogFullWbmMod1Fix_WI2b.png", res = 300, units = "in", width = 9, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullWbmMod1Fix_WI2b  %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing))+  facet_wrap(~Weeds, labeller = labeller(Weeds = c("M" = "Ambient Weeds", "SW" = "Surrogate Weeds" ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = response +(SE+9))) +
+  labs(x="Timing of Mowing", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+#dev.off()
+```
+
+
+
+
+
+```{r}
+#Tukey method for comparing means
+cld.LogFullWbmMod1_WI.Mowing <-cld(emmeans(LogFullWbmMod1_WI, ~ Mowing), Letters = "abcde", sort = FALSE, reversed = TRUE)
+
+cld.LogFullWbmMod1_WI.Weeds <-cld(emmeans(LogFullWbmMod1_WI, ~ Weeds), Letters = "abcde", sort = FALSE, reversed = TRUE)
+
+#Fisher's method for comparing means
+cld.LogFullWbmMod1_WI.Mowingb <-cld(emmeans(LogFullWbmMod1_WI, ~ Mowing), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+
+cld.LogFullWbmMod1_WI.Mowingb <-cld(emmeans(LogFullWbmMod1_WI, ~ Mowing), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+
+cld.LogFullWbmMod1_WI.Weedsb <-cld(emmeans(LogFullWbmMod1_WI, ~ Weeds), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+#Using Fisher's method for comparing means
+png("LogFullWbmMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(M_SW.WI, cld.LogFullWbmMod1_WI.Mowingb) %>% 
+ggplot(.,aes(Mowing, WBM1, fill=Mowing))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+#Tukey method for comparing means
+cld.LogFullWbmMod1_WI.Mowing <-cld(emmeans(LogFullWbmMod1_WI, ~ Mowing), Letters = "abcde", sort = FALSE, reversed = FALSE)
+
+cld.LogFullWbmMod1_WI.Weeds <-cld(emmeans(LogFullWbmMod1_WI, ~ Weeds), Letters = "abcde", sort = FALSE, reversed = TRUE)
+
+#Fisher's method for comparing means
+cld.LogFullWbmMod1_WI.Mowingb <-cld(emmeans(LogFullWbmMod1_WI, ~ Mowing), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+cld.LogFullWbmMod1_WI.Weedsb <-cld(emmeans(LogFullWbmMod1_WI, ~ Weeds), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+#Using Fisher's method for comparing means
+
+png("LogFullWbmMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(M_SW.WI,cld.LogFullWbmMod1_WI.Mowingb) %>% 
+ggplot(.,aes(Mowing, WBM1, fill=Mowing))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+```
+
+###Maine
+```{r}
+
+
+#Fisher's method for comparing means
+cld.LogFullWbmMod1Fix_MEb <-cld(emmeans(LogFullWbmMod1Fix_ME, ~ Mowing,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+cld.LogFullWbmMod1Fix_ME1b <-cld(emmeans(LogFullWbmMod1Fix_ME, ~ Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+cld.LogFullWbmMod1Fix_ME2b <-cld(emmeans(LogFullWbmMod1Fix_ME, ~ Mowing|Weeds,type="response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+#Using Fisher's method for comparing means
+
+```
+####Mowing NS
+```{r}
+png("LogFullWbmMod1Fix_ME.png", res = 300, units = "in", width = 5.2, height = 4)
+#left_join(M_SW.FH,
+ cld.LogFullWbmMod1Fix_MEb %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing))+
+  #stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = response +(SE+4))) +labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+```
+####Weeds NS
+```{r}
+#png("cld.LogFullWbmMod1_ME1b.png", res = 300, units = "in", width = 8, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullWbmMod1Fix_ME1b %>% 
+ggplot(.,aes(Weeds, response, fill=Weeds))+  
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = response+(SE+4))) +
+  labs(x="Weed level", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("Ambient\n Weeds", "Surrogate\n Weeds"
+                             ))+
+scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+#dev.off()
+
+```
+####Mowing|Weeds NS
+```{r}
+
+#Graphing
+
+png("LogFullWbmMod1Fix_ME2b.png", res = 300, units = "in", width = 9, height = 4)
+#left_join(M_SW.ALL,
+cld.LogFullWbmMod1Fix_ME2b  %>% 
+ggplot(.,aes(Mowing, response, fill=Mowing))+  facet_wrap(~Weeds, labeller = labeller(Weeds = c("M" = "Ambient Weeds", "SW" = "Surrogate Weeds" ))) +
+ # stat_summary(geom = "bar", fun = "mean") +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+ geom_text(aes(label = trimws(.group), size=6.5, y = response +(SE+9))) +
+  labs(x="Timing of Mowing", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing",
+                              "Late\nmowing", "No\nmowing"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```

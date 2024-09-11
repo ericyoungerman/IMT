@@ -1,0 +1,1350 @@
+---
+title: "Inter Row Mowing Analysis"
+author: "Eric Youngerman"
+date: "2024-02-15"
+output: html_document
+---
+
+
+#Library 
+```{r}
+setwd("/Users/ey239/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis")
+
+#Load packages 
+install.packages("tidyverse")
+install.packages("patchwork")
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(viridis)
+library(rstatix)
+library(Matrix)
+library(multcomp)
+library(multcompView)
+library(ggResidpanel)
+library(tidyverse)
+library(car)
+library(glmmTMB)
+library(DHARMa)
+library(patchwork)
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+#find the value to add to x before ln(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+#ALLSITES
+```{r}
+#Load data
+#Farmhub
+M_SW.FH <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/FH_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+M_SW.FH$TRT <- as.factor(M_SW.FH$TRT)
+M_SW.FH$BLOCK <- as.factor(M_SW.FH$BLOCK)
+M_SW.FH$PLOT <- as.factor(M_SW.FH$PLOT)
+M_SW.FH$MICROPLOT <- as.factor(M_SW.FH$MICROPLOT)
+
+#Cornell 
+#Load data
+M_SW.CU <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/CU_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+M_SW.CU$TRT <- as.factor(M_SW.CU$TRT)
+M_SW.CU$BLOCK <- as.factor(M_SW.CU$BLOCK)
+M_SW.CU$PLOT <- as.factor(M_SW.CU$PLOT)
+M_SW.CU$MICROPLOT <- as.factor(M_SW.CU$MICROPLOT)
+
+#Vermont
+#Load data
+M_SW.VT <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/VT_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+M_SW.VT$TRT <- as.factor(M_SW.VT$TRT)
+M_SW.VT$BLOCK <- as.factor(M_SW.VT$BLOCK)
+M_SW.VT$PLOT <- as.factor(M_SW.VT$PLOT)
+M_SW.VT$MICROPLOT <- as.factor(M_SW.VT$MICROPLOT)
+
+#Wisconsin
+#Load data
+M_SW.WI <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/WI_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+M_SW.WI$TRT <- as.factor(M_SW.WI$TRT)
+M_SW.WI$BLOCK <- as.factor(M_SW.WI$BLOCK)
+M_SW.WI$PLOT <- as.factor(M_SW.WI$PLOT)
+M_SW.WI$MICROPLOT <- as.factor(M_SW.WI$MICROPLOT)
+
+#MAINE
+#Load data
+M_SW.ME <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/ME_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+M_SW.ME$TRT <- as.factor(M_SW.ME$TRT)
+M_SW.ME$BLOCK <- as.factor(M_SW.ME$BLOCK)
+M_SW.ME$PLOT <- as.factor(M_SW.ME$PLOT)
+M_SW.ME$MICROPLOT <- as.factor(M_SW.ME$MICROPLOT)
+
+#Combine all data
+
+M_SW.ALL <- bind_rows(M_SW.CU, M_SW.FH, M_SW.VT, M_SW.WI, M_SW.ME)
+
+M_SW.ALL$TRT <- as.factor(M_SW.ALL$TRT)
+M_SW.ALL$BLOCK <- as.factor(M_SW.ALL$BLOCK)
+M_SW.ALL$PLOT <- as.factor(M_SW.ALL$PLOT)
+M_SW.ALL$MICROPLOT <- as.factor(M_SW.ALL$MICROPLOT)
+
+```
+#LEVENE TEST
+```{r}
+leveneTest((EMERG) ~ LOC, data = M_SW.ALL)
+#Levene's test was significant so sites need to be analyzed separately
+#Sometimes counts need square root transformation
+
+FullWBMod1_FH <- lmer(EMERG ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = M_SW.FH)
+summary(FullWBMod1_FH)
+resid_panel(FullWBMod1_FH)
+
+#Square root transformation
+sqrtFullWBMod1_FH <- lmer(sqrt(EMERG) ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = M_SW.FH)
+
+
+
+#comparison of transformed data with orgiinal data
+list(FullWBMod1_FH, sqrtFullWBMod1_FH) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+# Use FullWBMod1_FH; sqrt transformation was unhelpful
+
+
+```
+
+
+#Model testing
+##FARMHUB
+##Loading and cleaning
+```{r}
+#Load data
+weedsupFH <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/FH_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+weedsupFH$TRT <- as.factor(weedsup$TRT)
+weedsupFH$BLOCK <- as.factor(weedsup$BLOCK)
+weedsupFH$PLOT <- as.factor(weedsup$PLOT)
+weedsupFH$MICROPLOT <- as.factor(weedsup$MICROPLOT)
+```
+
+## Bean Emergence
+
+Results are not significant, 
+The following is from URI who pointed out that with count data, one should use a generalized linear model instead of a linear model. Furthermore
+if using a linear model, you need to demonstrate that it provides the best fit.
+```{r}
+str(weedsup)
+
+
+
+#lmer
+EmMod1_FH <- lmer(EMERG ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(EmMod1_FH)
+leveneTest((EMERG) ~  TRT, data = weedsup)
+resid_panel(EmMod1_FH)
+anova(EmMod1_FH)
+
+#glmer
+mod1_negbi1 <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = nbinom1(),
+                      data = weedsup)
+mod1_negbi2 <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = nbinom2(),
+                      data = weedsup)
+mod1_pos <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = poisson(),
+                      data = weedsup)
+
+simulateResiduals(mod1_pos, plot = TRUE)
+car::Anova(mod1_pos, type = 3)
+
+#Tukey method for comparing means
+cld.EmMod1_FH<-cld(emmeans(EmMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.EmMod1_FHb<-cld(emmeans(EmMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("EmMod1_FH.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.EmMod1_FHb) %>% 
+ggplot(.,aes(TRT, EMERG, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean emergence"~(plants~m^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+## Bean Biomass
+This is bean biomass collected at peak weed sampling, 
+
+```{r}
+str(weedsup)
+
+#lmer
+BBMMod1_FH <- lmer(BBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(BBMMod1_FH)
+leveneTest((BBM1) ~  TRT, data = weedsup)
+resid_panel(BBMMod1_FH)
+anova(BBMMod1_FH)
+
+#Tukey method for comparing means
+cld.BBMMod1_FH<-cld(emmeans(BBMMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.BBMMod1_FHb<-cld(emmeans(BBMMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("BBMMod1_FH.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.BBMMod1_FHb) %>% 
+ggplot(.,aes(TRT, BBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+
+##Weed Biomass
+Total weed biomass collected at peak weed biomass
+Mixed Linear model with 
+
+```{r}
+str(weedsup)
+
+#lmer
+WBMMod1_FH <- lmer(WBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsupFH)
+summary(WBMMod1_FH)
+leveneTest((WBM1) ~  TRT, data = weedsup)
+resid_panel(WBMMod1_FH)
+anova(WBMMod1_FH)
+
+FullWBMod1_FH <- lmer(WBM1 ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = weedsupFH)
+summary(FullWBMod1_FH)
+list(WBMMod1_FH, FullWBMod1_FH) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+  
+find_logw0(weedsupFH$WBM1)
+
+#block by treatment with 0 variation should be left in model
+
+
+# this looks ok, better when log transormed, but treatment significance is lost
+logFullWBMod1_FH <- lmer(log1p(WBM1) ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = weedsupFH)
+summary(FullWBMod1_FH)
+list(WBMMod1_FH, FullWBMod1_FH, logFullWBMod1_FH) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+logWBMMod1_FH <- lmer(log1p(WBM1) ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsupFH)
+summary(WBMMod1_FH)
+leveneTest(log1p(WBM1) ~  TRT, data = weedsup)
+resid_panel(logWBMMod1_FH)
+anova(logWBMMod1_FH)
+
+
+#Tukey method for comparing means
+cld.WBMMod1_FH<-cld(emmeans(WBMMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.WBMMod1_FHb<-cld(emmeans(WBMMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("WBMMod1_FH.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.WBMMod1_FHb) %>% 
+ggplot(.,aes(TRT, WBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+
+## Bean Density
+No significance
+```{r}
+str(weedsup)
+
+#lmer
+DENMod1_FH <- lmer(DEN1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(DENMod1_FH)
+leveneTest((DEN1) ~  TRT, data = weedsup)
+resid_panel(DENMod1_FH)
+anova(DENMod1_FH)
+
+#Tukey method for comparing means
+cld.DENMod1_FH<-cld(emmeans(DENMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.DENMod1_FHb<-cld(emmeans(DENMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("DENMod1_FH.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.DENMod1_FHb) %>% 
+  ggplot(aes(TRT, DEN1, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean density" ~ (plants ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+
+##Bean Yield
+Treatment and microplot are not significant
+
+```{r}
+str(weedsup)
+
+#lmer
+YDMod1_FH <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_FH)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_FH)
+anova(YDMod1_FH)
+
+#Tukey method for comparing means
+cld.YDMod1_FH<-cld(emmeans(YDMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.YDMod1_FHb<-cld(emmeans(YDMod1_FH, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("YDMod1_FH.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.YDMod1_FHb) %>% 
+  ggplot(aes(TRT, BEANYD3, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean yield" ~ (kg ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+
+
+#CORNELL
+
+## Loading and cleaning
+```{r}
+#Load data
+weedsupCU <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/IMT 2023/R analysis/CU_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+weedsupCU$TRT <- as.factor(weedsupCU$TRT)
+weedsupCU$BLOCK <- as.factor(weedsupCU$BLOCK)
+weedsupCU$PLOT <- as.factor(weedsupCU$PLOT)
+weedsupCU$MICROPLOT <- as.factor(weedsupCU$MICROPLOT)
+```
+## Bean Emergence
+
+Results are not significant, 
+The following is from URI who pointed out that with count data, one should use a generalized linear model instead of a linear model. Furthermore
+if using a linear model, you need to demonstrate that it provides the best fit.
+```{r}
+str(weedsup)
+
+#lmer
+EmMod1_CU <- lmer(EMERG ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(EmMod1_CU)
+leveneTest((EMERG) ~  TRT, data = weedsup)
+resid_panel(EmMod1_CU)
+anova(EmMod1_CU)
+
+
+#Tukey method for comparing means
+cld.EmMod1_CU<-cld(emmeans(EmMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.EmMod1_CUb<-cld(emmeans(EmMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("EmMod1_CU.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.EmMod1_CUb) %>% 
+ggplot(.,aes(TRT, EMERG, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean emergence"~(plants~m^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+
+## Bean Biomass
+This is bean biomass collected at peak weed sampling, 
+
+```{r}
+str(weedsup)
+
+#lmer
+BBMMod1_CU <- lmer(BBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(BBMMod1_CU)
+leveneTest((BBM1) ~  TRT, data = weedsup)
+resid_panel(BBMMod1_CU)
+anova(BBMMod1_CU)
+
+#Tukey method for comparing means
+cld.BBMMod1_CU<-cld(emmeans(BBMMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.BBMMod1_CUb<-cld(emmeans(BBMMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("BBMMod1_CU.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.BBMMod1_CUb) %>% 
+ggplot(.,aes(TRT, BBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+##Weed Biomass
+Total weed biomass collected at peak weed biomass
+Mixed Linear model with 
+
+```{r}
+str(weedsup)
+
+#Huong's model
+WBMMod1_CU <- lmer(WBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsupCU)
+summary(WBMMod1_CU)
+
+
+FullWBMod1_CU <- lmer(WBM1 ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = weedsupCU)
+summary(FullWBMod1_CU)
+list(WBMMod1_CU, FullWBMod1_CU) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+  
+find_logw0(weedsupCU$WBM1)
+
+logFullWBMod1_CU <- lmer(log(WBM1+7.38) ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = weedsupCU)
+list(WBMMod1_CU, FullWBMod1_CU, logFullWBMod1_CU) %>%
+  lapply(resid_panel, qqbands = TRUE, nrow=2) %>%
+  wrap_plots() +
+  plot_annotation(tag_levels = "A")
+
+
+
+
+#lmer
+WBMMod1_CU <- lmer(WBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(WBMMod1_CU)
+leveneTest((WBM1) ~  TRT, data = weedsup)
+resid_panel(WBMMod1_CU)
+anova(WBMMod1_CU)
+
+# this looks ok, better when log transormed, but treatment significance is lost
+logWBMMod1_CU <- lmer(log1p(WBM1) ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(WBMMod1_CU)
+leveneTest(log1p(WBM1) ~  TRT, data = weedsup)
+resid_panel(logWBMMod1_CU)
+anova(logWBMMod1_CU)
+
+
+#Tukey method for comparing means
+cld.WBMMod1_CU<-cld(emmeans(WBMMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.WBMMod1_CUb<-cld(emmeans(WBMMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("WBMMod1_CU.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.WBMMod1_CUb) %>% 
+ggplot(.,aes(TRT, WBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+
+## Bean Density
+
+```{r}
+str(weedsup)
+
+#lmer
+DENMod1_CU <- lmer(DEN1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(DENMod1_CU)
+leveneTest((DEN1) ~  TRT, data = weedsup)
+resid_panel(DENMod1_CU)
+anova(DENMod1_CU)
+
+#Tukey method for comparing means
+cld.DENMod1_CU<-cld(emmeans(DENMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.DENMod1_CUb<-cld(emmeans(DENMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("DENMod1_CU.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.DENMod1_CUb) %>% 
+  ggplot(aes(TRT, DEN1, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean density" ~ (plants ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+##Bean Yield
+
+
+```{r}
+str(weedsup)
+
+#lmer
+YDMod1_CU <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_CU)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_CU)
+anova(YDMod1_CU)
+
+#Tukey method for comparing means
+cld.YDMod1_CU<-cld(emmeans(YDMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.YDMod1_CUb<-cld(emmeans(YDMod1_CU, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("YDMod1_CU.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.YDMod1_CU) %>% 
+  ggplot(aes(TRT, BEANYD3, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean yield" ~ (kg ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+#VERMONT
+## Loading and cleaning
+```{r}
+#Load data
+weedsup <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/R analysis/VT_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+weedsup$TRT <- as.factor(weedsup$TRT)
+weedsup$BLOCK <- as.factor(weedsup$BLOCK)
+weedsup$PLOT <- as.factor(weedsup$PLOT)
+weedsup$MICROPLOT <- as.factor(weedsup$MICROPLOT)
+```
+## Bean Emergence
+
+ 
+The following is from URI who pointed out that with count data, one should use a generalized linear model instead of a linear model. Furthermore
+if using a linear model, you need to demonstrate that it provides the best fit.
+```{r}
+str(weedsup)
+
+#lmer
+EmMod1_VT <- lmer(EMERG ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(EmMod1_VT)
+leveneTest((EMERG) ~  TRT, data = weedsup)
+resid_panel(EmMod1_VT)
+anova(EmMod1_VT)
+
+#glmer
+mod1_negbi1 <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = nbinom1(),
+                      data = weedsup)
+mod1_negbi2 <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = nbinom2(),
+                      data = weedsup)
+mod1_pos <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = poisson(),
+                      data = weedsup)
+
+simulateResiduals(mod1_pos, plot = TRUE)
+car::Anova(mod1_pos, type = 3)
+
+#Tukey method for comparing means
+cld.EmMod1_VT<-cld(emmeans(EmMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.EmMod1_VTb<-cld(emmeans(EmMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("EmMod1_VT.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.EmMod1_VTb) %>% 
+ggplot(.,aes(TRT, EMERG, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean emergence"~(plants~m^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+
+## Bean Biomass
+This is bean biomass collected at peak weed sampling, bean biomass in the
+LWC is likely due to damage caused by the interrow mower
+
+```{r}
+str(weedsup)
+
+#lmer
+BBMMod1_VT <- lmer(BBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(BBMMod1_VT)
+leveneTest((BBM1) ~  TRT, data = weedsup)
+resid_panel(BBMMod1_VT)
+anova(BBMMod1_VT)
+
+#Tukey method for comparing means
+cld.BBMMod1_VT<-cld(emmeans(BBMMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.BBMMod1_VTb<-cld(emmeans(BBMMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("BBMMod1_VT.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.BBMMod1_VT) %>% 
+ggplot(.,aes(TRT, BBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+##Weed Biomass
+Total weed biomass collected at peak weed biomass
+Mixed Linear model with 
+
+```{r}
+str(weedsup)
+
+#lmer
+WBMMod1_VT <- lmer(WBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(WBMMod1_VT)
+leveneTest((WBM1) ~  TRT, data = weedsup)
+resid_panel(WBMMod1_VT)
+anova(WBMMod1_VT)
+
+#doesn't pass assumptions, needs to be log transformed
+logWBMMod1_VT <- lmer(log1p(WBM1) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(WBM1) ~  TRT, data = weedsup)
+resid_panel(logWBMMod1_VT)
+summary(WBMMod1_VT)
+anova(logWBMMod1_VT)
+
+#Tukey method for comparing means
+cld.WBMMod1_VT<-cld(emmeans(logWBMMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.WBMMod1_VTb<-cld(emmeans(logWBMMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+
+#Graphing
+png("WBMMod1_VT.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.WBMMod1_VTb) %>% 
+ggplot(.,aes(TRT, WBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+## Bean Density
+
+```{r}
+str(weedsup)
+
+#lmer
+DENMod1_VT <- lmer(DEN1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(DENMod1_VT)
+leveneTest((DEN1) ~  TRT, data = weedsup)
+resid_panel(DENMod1_VT)
+anova(DENMod1_VT)
+
+#Tukey method for comparing means
+cld.DENMod1_VT<-cld(emmeans(DENMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.DENMod1_VTb<-cld(emmeans(DENMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("DENMod1_VT.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.DENMod1_VTb) %>% 
+  ggplot(aes(TRT, DEN1, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean density" ~ (plants ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+##Bean Yield
+```{r}
+str(weedsup)
+
+#lmer
+YDMod1_VT <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_VT)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_VT)
+anova(YDMod1_VT)
+
+#Barely passes assumptions, should be to be log transformed
+logYDMod1_VT <- lmer(log10(BEANYD3) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(BEANYD3) ~  TRT, data = weedsup)
+resid_panel(logYDMod1_VT)
+summary(WBMMod1_VT)
+anova(logWBMMod1_VT)
+
+#log transforming didn't help 
+#Load data after removing one outlier from in yield due to damage from mowing. 
+weedsup <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/R analysis/VT_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw-out")
+
+#lmer
+YDMod1_VT <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_VT)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_VT)
+anova(YDMod1_VT)
+
+
+
+#Tukey method for comparing means
+cld.YDMod1_VT<-cld(emmeans(YDMod1_VT, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.YDMod1_VTb<-cld(emmeans(YDMod1_VT, ~ TRT), Letters = "abcde", sort = TRUE, adjust="none", reversed=TRUE)
+
+
+#Graphing
+png("YDMod1_VT.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.YDMod1_VTb) %>% 
+  ggplot(aes(TRT, BEANYD3, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean yield" ~ (kg ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control","Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+#WISCONSIN
+## Loading and cleaning
+```{r}
+#Load data
+weedsup <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/R analysis/WI_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+weedsup$TRT <- as.factor(weedsup$TRT)
+weedsup$BLOCK <- as.factor(weedsup$BLOCK)
+weedsup$PLOT <- as.factor(weedsup$PLOT)
+weedsup$MICROPLOT <- as.factor(weedsup$MICROPLOT)
+```
+## Bean Emergence
+
+ 
+The following is from URI who pointed out that with count data, one should use a generalized linear model instead of a linear model. Furthermore
+if using a linear model, you need to demonstrate that it provides the best fit.
+```{r}
+str(weedsup)
+
+#lmer
+EmMod1_WI <- lmer(EMERG ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(EmMod1_WI)
+leveneTest((EMERG) ~  TRT, data = weedsup)
+resid_panel(EmMod1_WI)
+anova(EmMod1_WI)
+
+#glmer
+mod1_negbi1 <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = nbinom1(),
+                      data = weedsup)
+mod1_negbi2 <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = nbinom2(),
+                      data = weedsup)
+mod1_pos <- glmmTMB(EMERG ~ TRT*MICROPLOT + (1|BLOCK), 
+                      family = poisson(),
+                      data = weedsup)
+
+simulateResiduals(mod1_pos, plot = TRUE)
+car::Anova(mod1_pos, type = 3)
+
+#Tukey method for comparing means
+cld.EmMod1_WI<-cld(emmeans(EmMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.EmMod1_WIb<-cld(emmeans(EmMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("EmMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.EmMod1_WIb) %>% 
+ggplot(.,aes(TRT, EMERG, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean emergence"~(plants~m^{-1})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+
+
+```
+## Bean Biomass
+
+```{r}
+str(weedsup)
+
+#lmer
+BBMMod1_WI <- lmer(BBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(BBMMod1_WI)
+leveneTest((BBM1) ~  TRT, data = weedsup)
+resid_panel(BBMMod1_WI)
+anova(BBMMod1_WI)
+
+#Tukey method for comparing means
+cld.BBMMod1_WI<-cld(emmeans(BBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.BBMMod1_WIb<-cld(emmeans(BBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#doesn't look great, needs to be log transformed
+logBBMMod1_WI <- lmer(log1p(BBM1) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(BBM1) ~  TRT, data = weedsup)
+resid_panel(logBBMMod1_WI)
+summary(logBBMMod1_WI)
+anova(logBBMMod1_WI)
+
+#Tukey method for comparing means
+cld.BBMMod1_WI<-cld(emmeans(logBBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.BBMMod1_WIb<-cld(emmeans(logBBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("BBMMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.BBMMod1_WIb) %>% 
+ggplot(.,aes(TRT, BBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+
+##Weed Biomass
+Total weed biomass collected at peak weed biomass
+Mixed Linear model with 
+
+```{r}
+str(weedsup)
+
+#lmer
+WBMMod1_WI <- lmer(WBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(WBMMod1_WI)
+leveneTest((WBM1) ~  TRT, data = weedsup)
+resid_panel(WBMMod1_WI)
+anova(WBMMod1_WI)
+#Tukey method for comparing means
+cld.WBMMod1_WI<-cld(emmeans(WBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.WBMMod1_WIb<-cld(emmeans(WBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#doesn't pass assumptions, needs to be log transformed
+logWBMMod1_WI <- lmer(log1p(WBM1) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(WBM1) ~  TRT, data = weedsup)
+resid_panel(logWBMMod1_WI)
+summary(WBMMod1_WI)
+anova(logWBMMod1_WI)
+
+#Tukey method for comparing means
+cld.WBMMod1_WI<-cld(emmeans(logWBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.logWBMMod1_WIb<-cld(emmeans(logWBMMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("WBMMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.logWBMMod1_WIb) %>% 
+ggplot(.,aes(TRT, WBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+
+## Bean Density
+
+```{r}
+str(weedsup)
+
+#lmer
+DENMod1_WI <- lmer(DEN1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(DENMod1_WI)
+leveneTest((DEN1) ~  TRT, data = weedsup)
+resid_panel(DENMod1_WI)
+anova(DENMod1_WI)
+
+#Tukey method for comparing means
+cld.DENMod1_WI<-cld(emmeans(DENMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.DENMod1_WIb<-cld(emmeans(DENMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("DENMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.DENMod1_WIb) %>% 
+  ggplot(aes(TRT, DEN1, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean density" ~ (plants ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+##Bean Yield
+Dry bean yield values were low due to a early frost that stopped the development of most pods
+```{r}
+str(weedsup)
+
+#lmer
+YDMod1_WI <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_WI)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_WI)
+anova(YDMod1_WI)
+
+#Barely passes assumptions, should be to be log transformed
+logYDMod1_WI <- lmer(log(BEANYD3 + 1) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log(BEANYD3 + 1) ~  TRT, data = weedsup)
+resid_panel(logYDMod1_WI)
+summary(logYDMod1_WI)
+anova(logYDMod1_WI)
+
+#log transforming didn't help 
+#Load data after removing four outlier from in yield due to damage from mowing. 
+weedsup <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/R analysis/WI_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw-out")
+
+
+weedsup$TRT <- as.factor(weedsup$TRT)
+weedsup$BLOCK <- as.factor(weedsup$BLOCK)
+weedsup$PLOT <- as.factor(weedsup$PLOT)
+weedsup$MICROPLOT <- as.factor(weedsup$MICROPLOT)
+
+
+#lmer
+YDMod1_WI <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_WI)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_WI)
+anova(YDMod1_WI)
+
+#passes assuptions but could look better, 
+logYDMod1_WI <- lmer(log1p(BEANYD3) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(BEANYD3) ~  TRT, data = weedsup)
+resid_panel(logYDMod1_WI)
+anova(logYDMod1_WI)
+
+#Tukey method for comparing means
+cld.YDMod1_WI<-cld(emmeans(YDMod1_WI, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.YDMod1_WIb<-cld(emmeans(YDMod1_WI, ~ TRT), Letters = "abcde", sort = TRUE, adjust="none", reversed=TRUE)
+cld.logYDMod1_WIb<-cld(emmeans(logYDMod1_WI, ~ TRT), Letters = "abcde", sort = TRUE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("YDMod1_WI.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.YDMod1_WIb) %>% 
+  ggplot(aes(TRT, BEANYD3, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean yield" ~ (kg ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control","Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+#MAINE
+## Loading and cleaning
+```{r}
+#Load data
+weedsup <- read_excel("~/Library/CloudStorage/Box-Box/ECOBEAN/EXPERIMENTS/Interrow Mowing Trial/R analysis/ME_IMT_RDATA.2023.xlsx", 
+    sheet = "m_sw")
+#in the Global Environment panel, click on the name of our dataframe (here "weedsup") to see how R has categorized the variables Re code as appropriate
+```
+```{r}
+# Here is the easiest way to to recode to factors. There are shortcuts in tidyverse for situations where you have way more columns to deal with. You can copy and paste this code, and change the "factor" bit to "numeric" or "character" or "POSIX" (ie time series) as needed.
+
+weedsup$TRT <- as.factor(weedsup$TRT)
+weedsup$BLOCK <- as.factor(weedsup$BLOCK)
+weedsup$PLOT <- as.factor(weedsup$PLOT)
+weedsup$MICROPLOT <- as.factor(weedsup$MICROPLOT)
+```
+## Bean Emergence
+counts were conducted only for the main plot level
+
+## Bean Biomass
+
+```{r}
+str(weedsup)
+
+#lmer
+BBMMod1_ME <- lmer(BBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(BBMMod1_ME)
+leveneTest((BBM1) ~  TRT, data = weedsup)
+resid_panel(BBMMod1_ME)
+anova(BBMMod1_ME)
+
+
+#Tukey method for comparing means
+cld.BBMMod1_ME<-cld(emmeans(BBMMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.BBMMod1_MEb<-cld(emmeans(BBMMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("BBMMod1_ME.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.BBMMod1_MEb) %>% 
+ggplot(.,aes(TRT, BBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Dry bean biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+##Weed Biomass
+Total weed biomass collected at peak weed biomass
+Mixed Linear model with 
+
+```{r}
+str(weedsup)
+
+#lmer
+WBMMod1_ME <- lmer(WBM1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(WBMMod1_ME)
+leveneTest((WBM1) ~  TRT, data = weedsup)
+resid_panel(WBMMod1_ME)
+anova(WBMMod1_ME)
+# passes assumptions, but looks messy, needs to be log transformed
+logWBMMod1_ME <- lmer(log1p(WBM1) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(WBM1) ~  TRT, data = weedsup)
+resid_panel(logWBMMod1_ME)
+summary(WBMMod1_ME)
+anova(logWBMMod1_ME)
+
+
+
+#Tukey method for comparing means logged
+cld.WBMMod1_ME<-cld(emmeans(logWBMMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means logged
+cld.WBMMod1_MEb<-cld(emmeans(logWBMMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Fisher's method for comparing means 
+cld.WBMMod1_MEb<-cld(emmeans(WBMMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=FALSE)
+
+#Graphing
+png("WBMMod1_ME.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup,cld.WBMMod1_MEb) %>% 
+ggplot(.,aes(TRT, WBM1, fill=TRT))+
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se",width = 0.1)+
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5)+
+  labs(x="Treatment", y=expression("Weed biomass"~(g~m^{-2})))+
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                              "Late\nweed control", "No\nweed control"))+
+  scale_y_continuous(expand=expansion(mult = c(0.05, 0.3)))+
+  scale_fill_viridis(discrete=TRUE, option="E", direction=-1,end=.9,begin=.1)+
+  theme_bw()+
+  theme(legend.position="none")
+dev.off()
+```
+## Bean Density
+
+```{r}
+str(weedsup)
+
+#lmer
+DENMod1_ME <- lmer(DEN1 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(DENMod1_ME)
+leveneTest((DEN1) ~  TRT, data = weedsup)
+resid_panel(DENMod1_ME)
+anova(DENMod1_ME)
+
+#Tukey method for comparing means
+cld.DENMod1_ME<-cld(emmeans(DENMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.DENMod1_MEb<-cld(emmeans(DENMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, adjust="none", reversed=TRUE)
+
+#Graphing
+png("DENMod1_ME.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.DENMod1_MEb) %>% 
+  ggplot(aes(TRT, DEN1, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean density" ~ (plants ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control",
+                               "Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+```
+##Bean Yield
+```{r}
+str(weedsup)
+
+#lmer
+YDMod1_ME <- lmer(BEANYD3 ~ TRT*MICROPLOT + (1|BLOCK) , data = weedsup)
+summary(YDMod1_ME)
+leveneTest((BEANYD3) ~  TRT, data = weedsup)
+resid_panel(YDMod1_ME)
+anova(YDMod1_ME)
+
+# passes assumptions, but doesn't look fantastic
+logYDMod1_ME <- lmer(log1p(BEANYD3) ~ TRT * MICROPLOT + (1 | BLOCK), data = weedsup)
+leveneTest(log1p(BEANYD) ~  TRT, data = weedsup)
+resid_panel(logYDMod1_ME)
+anova(logWBMMod1_ME)
+
+#worse levene's values, so we'll stick with original data
+
+
+#Tukey method for comparing means
+cld.YDMod1_ME<-cld(emmeans(YDMod1_ME, ~ TRT), Letters = "abcde", sort = FALSE, reversed = TRUE)
+#Fisher's method for comparing means
+cld.YDMod1_MEb<-cld(emmeans(YDMod1_ME, ~ TRT), Letters = "abcde", sort = TRUE, adjust="none", reversed=TRUE)
+
+
+#Graphing
+png("YDMod1_ME.png", res = 300, units = "in", width = 5.2, height = 4)
+left_join(weedsup, cld.YDMod1_MEb) %>% 
+  ggplot(aes(TRT, BEANYD3, fill = TRT)) +
+  stat_summary(geom = "bar", fun = "mean") +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.1) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), size = 6.5, vjust = -0.5) +
+  labs(x = "Treatment", y = expression("Dry bean yield" ~ (kg ~ ha^{-1}))) +
+  scale_x_discrete(labels = c("As-needed\nweed control", "Early\nweed control","Late\nweed control", "No\nweed control")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3)), 
+                     labels = scales::comma) +  # Format labels with commas
+  scale_fill_viridis(discrete = TRUE, option = "E", direction = -1, end = 0.9, begin = 0.1) +
+  theme_bw() +
+  theme(legend.position = "none")
+dev.off()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Other ideas
+EmMod1_FH <- lmer(EMERG ~ BLOCK + TRT*MICROPLOT + (1|BLOCK:TRT) + (1|BLOCK:MICROPLOT) , data = weedsup)
+
+#Effect of treatment on Bean Emergence displayed in m^2 using EMERGE with Block  as random effect
+# We would expect no effect as treatment took place after emergence
+
+mod2 <- lmer(EMERG ~ TRT + (1|BLOCK), data = weedsup)
+leveneTest(EMERG~TRT,data=weedsup)
+resid_panel(mod2)
+anova(mod2)
+
+#Effect of treatment on Bean Density displayed in m^2 using BEANDEN with Block  as random effects
+
+
+mod3 <- lmer(WBM1~ TRT + (1|BLOCK), data = weedsup)
+leveneTest(BEANDEN~TRT,data=weedsup)
+resid_panel(mod3)
+anova(mod3)
+
+#To take into the account of surrogate weed plots and its interaction with treatment
+mod5 <- lmer(TOTWBM1 ~ TRT + Microplot + TRT*Microplot +(1|BLOCK), data = weedsup)
+leveneTest(BEANYD1~TRT,data=weedsup)
+resid_panel(mod5)
+anova(mod5)
+
+#The interaction between fixed effects is non-significant so do not include in analysis
+mod5 <- lmer(TOTWBM1 ~ TRT + Microplot +(1|BLOCK), data = weedsup)
+leveneTest(TOTWB1~TRT,data=weedsup)
+resid_panel(mod5)
+anova(mod5)
+#ANOVA
+## Anova table for weed biomass
+```{r}
+list(logFullWBMod1_FH, logFullWBMod1_CU) %>%
+setNames(c("Farm hub", "Cornell"))%>%
+  lapply(joint_tests)
+```
+#Means
+```{r}
+emmeans
