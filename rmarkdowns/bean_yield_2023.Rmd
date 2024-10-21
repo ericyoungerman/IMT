@@ -1,0 +1,88 @@
+---
+title: "bean_yield_2023"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **Library**
+
+```{r message=FALSE, warning=FALSE}
+
+#Set work directory
+setwd("/Users/ey239/Github/IMT/rmarkdowns")
+
+#Load packages 
+library(tidyverse) ##install.packages("tidyverse")
+library(knitr)
+library(patchwork) ##install.packages("patchwork")
+library(skimr)     ##install.packages("skimr")
+library(readxl)
+library(janitor) ##install.packages("janitor")
+
+#library(kableExtra) ##install.packages("kableExtra")
+#library(viridis) ##install.packages("viridis")
+#library(lme4) ##install.packages("lme4")
+#library(lmerTest) ##install.packages("lmerTest")
+#library(emmeans) ##install.packages("emmeans")
+#library(rstatix) ##install.packages("rstatix")
+#library(Matrix) ##install.packages("Matrix")
+#library(multcomp) ##install.packages("multcomp")
+#library(multcompView) ##install.packages("multcompView")
+#library(ggResidpanel) ##install.packages("ggResidpanel")
+#library(car)
+#library(TMB)  ##install.packages("TMB")
+#library(glmmTMB)  ##install.packages("glmmTMB")
+#library(DHARMa)  ##install.packages("DHARMa")
+
+#Load Functions
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+
+<br>
+
+# **Load and Clean Data**
+## **Farm hub**
+
+```{r message=FALSE, warning=FALSE}
+fh_raw_2023 <- read_excel("~/Github/IMT/raw-data/farmhub_raw_2023.xlsx") #load file
+
+fh_clean_2023 <- clean_names(fh_raw_2023) |>  #change column names and convert to factors
+  rename ('mowing'= trt,'weeds'= microplot) |> 
+  mutate(across(c(mowing, block, plot, weeds), as.factor))
+
+fh_yield_2023_grams_meter <- fh_clean_2023 |>
+  filter(weeds %in% c("SW", "M")) |>
+  select(c(1:6, beanyd))
+kable(head(fh_yield_2023_grams_meter))
+  
+  
+fh_yield_2023_adj_bush_acre <- fh_clean_2023 |>
+  filter(weeds %in% c("SW", "M")) |>
+  select(c(1:6, beanyd)) |>
+  mutate(beanyd = (((beanyd/454)/(16.4/43560))/60)) |> 
+  mutate(beanyd = (beanyd * ((100-0.00001)/(100-14))))
+kable(head(fh_yield_2023_adj_bush_acre)) 
+
+fh_yield_2023_adj_lbs_acre <- fh_clean_2023 |>
+  filter(weeds %in% c("SW", "M")) |>
+  select(c(1:6, beanyd)) |>
+  mutate(beanyd = ((beanyd/454)/(16.4/43560))) |> 
+  mutate(beanyd = (beanyd * ((100-0.00001)/(100-14))))
+kable(head(fh_yield_2023_adj_lbs_acre)) 
+
+
+
+
+```
+
+<br>
+
+# **Load and Clean Data**
+## **Musgrave**
