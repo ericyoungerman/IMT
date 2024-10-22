@@ -51,7 +51,16 @@ return(d)}
 ## **Farm hub**
 
 ```{r message=FALSE, warning=FALSE}
-fh_raw_2023 <- read_excel("~/Github/IMT/raw-data/farmhub_raw_2023.xlsx") #load file
+# load individual datasets
+fh_raw_2023 <- read_excel("~/Github/IMT/raw-data/farmhub_raw_2023.xlsx")
+cu_raw_2023 <- read_excel("~/Github/IMT/raw-data/cornell_raw_2023.xlsx")
+me_raw_2023 <- read_excel("~/Github/IMT/raw-data/maine_raw_2023.xlsx")
+vt_raw_2023 <- read_excel("~/Github/IMT/raw-data/vermont_raw_2023.xlsx")
+wi_raw_2023 <- read_excel("~/Github/IMT/raw-data/wisconsin_raw_2023.xlsx")
+
+
+
+
 
 fh_clean_2023 <- clean_names(fh_raw_2023) |>  #change column names and convert to factors
   rename ('mowing'= trt,'weeds'= microplot) |> 
