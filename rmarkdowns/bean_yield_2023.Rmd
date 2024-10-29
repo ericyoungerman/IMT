@@ -1,13 +1,14 @@
 ---
-title: "bean_yield_2023"
+title: "dry_bean_yield_2023"
 output: github_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
 ```
 
-# **Library**
+# **Load libraries**
 
 ```{r message=FALSE, warning=FALSE}
 
@@ -22,16 +23,18 @@ library(skimr)     ##install.packages("skimr")
 library(readxl)
 library(janitor) ##install.packages("janitor")
 
-#library(kableExtra) ##install.packages("kableExtra")
-#library(viridis) ##install.packages("viridis")
-#library(lme4) ##install.packages("lme4")
-#library(lmerTest) ##install.packages("lmerTest")
-#library(emmeans) ##install.packages("emmeans")
-#library(rstatix) ##install.packages("rstatix")
+library(kableExtra) ##install.packages("kableExtra")
+library(webshot) ##install.packages("webshot")
+webshot::install_phantomjs()
+library(viridis) ##install.packages("viridis")
+library(lme4) ##install.packages("lme4")
+library(lmerTest) ##install.packages("lmerTest")
+library(emmeans) ##install.packages("emmeans")
+library(rstatix) ##install.packages("rstatix")
 #library(Matrix) ##install.packages("Matrix")
-#library(multcomp) ##install.packages("multcomp")
-#library(multcompView) ##install.packages("multcompView")
-#library(ggResidpanel) ##install.packages("ggResidpanel")
+library(multcomp) ##install.packages("multcomp")
+library(multcompView) ##install.packages("multcompView")
+library(ggResidpanel) ##install.packages("ggResidpanel")
 #library(car)
 #library(TMB)  ##install.packages("TMB")
 #library(glmmTMB)  ##install.packages("glmmTMB")
@@ -48,50 +51,261 @@ return(d)}
 <br>
 
 # **Load and Clean Data**
-## **Farm hub**
-
+### **Load individual datasets**
 ```{r message=FALSE, warning=FALSE}
-# load individual datasets
+
+
 fh_raw_2023 <- read_excel("~/Github/IMT/raw-data/farmhub_raw_2023.xlsx")
+kable(head(fh_raw_2023))
+
 cu_raw_2023 <- read_excel("~/Github/IMT/raw-data/cornell_raw_2023.xlsx")
-me_raw_2023 <- read_excel("~/Github/IMT/raw-data/maine_raw_2023.xlsx")
+kable(head(cu_raw_2023))
+
+me_raw_2023 <- read_excel("~/Github/IMT/raw-data/maine_raw_2023.xlsx", 
+                          na = c("na")) # convert na to NA
+kable(head(me_raw_2023))
+
 vt_raw_2023 <- read_excel("~/Github/IMT/raw-data/vermont_raw_2023.xlsx")
+kable(head(vt_raw_2023))
+
 wi_raw_2023 <- read_excel("~/Github/IMT/raw-data/wisconsin_raw_2023.xlsx")
-
-
-
-
-
-fh_clean_2023 <- clean_names(fh_raw_2023) |>  #change column names and convert to factors
-  rename ('mowing'= trt,'weeds'= microplot) |> 
-  mutate(across(c(mowing, block, plot, weeds), as.factor))
-
-fh_yield_2023_grams_meter <- fh_clean_2023 |>
-  filter(weeds %in% c("SW", "M")) |>
-  select(c(1:6, beanyd))
-kable(head(fh_yield_2023_grams_meter))
-  
-  
-fh_yield_2023_adj_bush_acre <- fh_clean_2023 |>
-  filter(weeds %in% c("SW", "M")) |>
-  select(c(1:6, beanyd)) |>
-  mutate(beanyd = (((beanyd/454)/(16.4/43560))/60)) |> 
-  mutate(beanyd = (beanyd * ((100-0.00001)/(100-14))))
-kable(head(fh_yield_2023_adj_bush_acre)) 
-
-fh_yield_2023_adj_lbs_acre <- fh_clean_2023 |>
-  filter(weeds %in% c("SW", "M")) |>
-  select(c(1:6, beanyd)) |>
-  mutate(beanyd = ((beanyd/454)/(16.4/43560))) |> 
-  mutate(beanyd = (beanyd * ((100-0.00001)/(100-14))))
-kable(head(fh_yield_2023_adj_lbs_acre)) 
-
-
-
+kable(head(wi_raw_2023))
 
 ```
 
 <br>
 
-# **Load and Clean Data**
-## **Musgrave**
+### **Combine all datasets and clean**
+```{r}
+all_raw_2023 <- bind_rows(fh_raw_2023, cu_raw_2023, me_raw_2023, vt_raw_2023, wi_raw_2023)
+
+
+#Standardaze column names, convert to factors, check for outliers of variable**
+all_clean_2023 <- clean_names(all_raw_2023) |>  
+  rename ('mowing'= trt,'weeds'= microplot) |> 
+  mutate(across(c(mowing, block, plot, weeds, loc), as.factor)) |> 
+  mutate(is_outlier = beanyd < (quantile(beanyd, 0.25) - 1.5 * IQR(beanyd)) |
+                       beanyd > (quantile(beanyd, 0.75) + 1.5 * IQR(beanyd)))
+
+
+#select and convert data for Yield analysis
+  
+all_yield_clean_2023 <-all_clean_2023 |>              
+  filter(is_outlier == FALSE) |>              # Keep rows where beanyd is not an outlier
+  filter(weeds %in% c("SW", "M")) |>       # Keep rows where SW and M are microplots
+  mutate(beanyd_adj_bu_acre = (((beanyd/454)/(16.4/43560))/60)* ((100-0.00001)/(100-14))) |> 
+  mutate(beanyd_adj_lbs_acre = ((beanyd/454)/(16.4/43560))* ((100-0.00001)/(100-14))) |>
+  mutate(beanyd_adj_kg_ha = ((beanyd/454)/(16.4/43560))* 1.12085 *((100-0.00001)/(100-14)))
+kable(head(all_yield_clean_2023)) 
+
+```
+
+<br>
+
+# **Assumptions**
+## **Levene's test**
+```{r}
+levene_test((beanyd_adj_kg_ha) ~ loc, data = all_yield_clean_2023)
+```
+
+# **Model Testing**
+
+### **location random**
+```{r}
+all_yield_random_2023  <- lmer(beanyd_adj_kg_ha ~  mowing*weeds + (1|loc) + (1|loc:block)+  (1|loc:block:mowing)  , data = all_yield_clean_2023)
+
+resid_panel(all_yield_random_2023)
+```
+
+
+### **location fixed**
+```{r}
+all_yield_fixed_2023 <- lmer(beanyd_adj_kg_ha ~ loc*mowing*weeds + (1|loc:block)+  (1|loc:block:mowing), data = all_yield_clean_2023)
+
+
+resid_panel(all_yield_fixed_2023)
+```
+
+The residuals apppear better with location as a fixed effect
+
+# **ANOVA table**
+```{r}
+ all_yield_fixed_2023 |> 
+  joint_tests() |> 
+  kable()  
+```
+
+# **Means comparison of yield**
+
+```{r message=FALSE}
+all_yield_means_2023 <- 
+ emmeans(all_yield_fixed_2023, ~ loc * mowing * weeds)
+# Optional: Adjust for multiple comparisons (e.g., using Tukey's method)
+
+pairwise_comparisons<- pairs(all_yield_means_2023) 
+kable(head(pairwise_comparisons))
+```
+
+
+### **Tukey method for comparing means**
+```{r}
+#Tukey method for comparing means
+#mowing
+cld_mowing_tukey <-cld(emmeans(all_yield_fixed_2023, ~  mowing, type="response"), Letters = letters, sort = FALSE, reversed = TRUE)
+cld_mowing_tukey
+
+#weeds
+cld_weeds_tukey <-cld(emmeans(all_yield_fixed_2023, ~  weeds, type = "response"), Letters = letters, sort = FALSE, reversed = FALSE)
+cld_weeds_tukey
+
+#mowing|weeds
+cld_weeds_mowing_tukey <-cld(emmeans(all_yield_fixed_2023, ~  weeds|mowing, type = "response"), Letters = letters, sort = FALSE, reversed = FALSE)
+cld_weeds_mowing_tukey
+
+#loc|weeds
+cld_weeds_loc_tukey <-cld(emmeans(all_yield_fixed_2023, ~  weeds|loc, type = "response"), Letters = letters, sort = FALSE, reversed = FALSE)
+cld_weeds_loc_tukey
+
+#loc|weeds
+cld_mowing_weeds_loc_tukey <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds|loc, type = "response"), Letters = letters, sort = FALSE, reversed = FALSE)
+cld_mowing_weeds_loc_tukey
+
+```
+<br>
+
+### **Fisher's method for comparing means**
+```{r}
+#Fisher's method for comparing means
+
+#mowing
+cld_mowing_fisher <-cld(emmeans(all_yield_fixed_2023, ~  mowing, type = "response"), Letters = letters, sort = FALSE, adjust="none", reversed=FALSE)
+cld_mowing_fisher
+
+#weeds
+cld_weeds_fisher <- cld(emmeans(all_yield_fixed_2023, ~  weeds, type = "response"), Letters = letters, sort = FALSE, adjust="none", reversed=FALSE)
+cld_weeds_fisher
+
+#mowing|weeds
+cld_mowing_weeds_fisher <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds, 
+                              type = "response"), Letters = letters, 
+                              sort = FALSE, adjust="none", reversed=FALSE)
+cld_mowing_weeds_fisher
+
+#mowing|weeds|loc
+cld_mowing_weeds_loc_fisher <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds|loc, type = "respons"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+cld_mowing_weeds_loc_fisher
+
+```
+
+<br>
+
+# **FIGURES**
+
+## **Mowing**
+
+```{r message=FALSE}
+all_yield_clean_2023 |> 
+  left_join(cld_mowing_fisher) |> 
+  ggplot(aes(x = mowing, y = beanyd_adj_kg_ha, fill = mowing)) +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  labs(
+    x = "Timing of Mowing",
+    y = expression("Dry bean yield" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of interrow mowing on dry bean yield"),
+    subtitle = expression(italic("P = 0.07"))) +
+  
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+ggsave("yield_plot_mowing.png", width = 8, height = 6, dpi = 300)
+```
+<br>
+
+## **weeds**
+```{r message=FALSE}
+all_yield_clean_2023 |> 
+  left_join(cld_weeds_fisher) |> 
+  ggplot(aes(x = weeds, y = beanyd_adj_kg_ha, fill = weeds)) +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  labs(
+    x = "Weediness",
+    y = expression("Dry bean yield" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of weed level on dry bean yield"),
+    subtitle = expression(italic("P < .005"))) +
+  scale_x_discrete(labels = c("Ambient weeds", "Ambient + Surrogate weeds")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+ggsave("yield_plot_weeds.png", width = 8, height = 6, dpi = 300)
+```
+<br>
+
+## **mowing|weeds**
+
+```{r message=FALSE}
+all_yield_clean_2023 |> 
+  left_join(cld_mowing_weeds_fisher) |> 
+  ggplot(aes(x = mowing, y = beanyd, fill = mowing)) +
+  facet_wrap(~weeds, labeller = labeller(weeds = c("M" = "Ambient weeds", "SW" = "Ambient + Surrogate weeds"))) +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  labs(
+    x = "Timing of mowing",
+    y = expression("Dry bean yield" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of interrow mowing on dry bean yield across weed levels"),
+    subtitle = expression(italic("P =0.11"))) +
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+ggsave("yield_plot_mowing_weeds.png", width = 8, height = 6, dpi = 300)
+```
+```{r message=FALSE}
+all_yield_clean_2023 |> 
+  left_join(cld_mowing_weeds_loc_fisher) |> 
+  ggplot(aes(x = mowing, y = beanyd_adj_kg_ha, fill = mowing)) +
+  facet_grid(weeds ~ loc, labeller = labeller(
+    loc = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME" = "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"),
+    weeds = c("M" = "Ambient Weeds", "SW" = "Ambient + Surrogate Weeds")
+  )) +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=4.5,vjust=-0.5) +
+  labs(
+    x = "Timing of mowing",
+    y = expression("Dry bean yield" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of mowing on dry bean yield across locations and weed levels"),
+    subtitle = expression(italic("P = 0.049"))) +
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+ggsave("yield_plot_mowing_weeds_loc.png", width = 15, height = 6, dpi = 300)
+```
+```

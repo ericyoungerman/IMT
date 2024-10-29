@@ -137,6 +137,7 @@ leveneTest((BEANYD3) ~ LOC, data = M_SW.ALLNM)
 ```
 #MODEL TESTING
 
+Lin
 ## All sites,FullBydMod1Fix_ALL
 
 ```{r}
