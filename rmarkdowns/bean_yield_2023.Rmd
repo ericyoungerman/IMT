@@ -166,7 +166,7 @@ cld_weeds_mowing_tukey
 cld_weeds_loc_tukey <-cld(emmeans(all_yield_fixed_2023, ~  weeds|loc, type = "response"), Letters = letters, sort = FALSE, reversed = FALSE)
 cld_weeds_loc_tukey
 
-#loc|weeds
+#loc|weeds|loc
 cld_mowing_weeds_loc_tukey <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds|loc, type = "response"), Letters = letters, sort = FALSE, reversed = FALSE)
 cld_mowing_weeds_loc_tukey
 
@@ -281,6 +281,11 @@ all_yield_clean_2023 |>
   )
 ggsave("yield_plot_mowing_weeds.png", width = 8, height = 6, dpi = 300)
 ```
+
+<br>
+
+## **mowing|weeds|loc**
+
 ```{r message=FALSE}
 all_yield_clean_2023 |> 
   left_join(cld_mowing_weeds_loc_fisher) |> 

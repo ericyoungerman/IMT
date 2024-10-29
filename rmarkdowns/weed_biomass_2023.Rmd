@@ -1,0 +1,209 @@
+---
+title: "weed_biomass_2023"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# **Load libraries**
+
+```{r message=FALSE, warning=FALSE}
+
+#Set work directory
+setwd("/Users/ey239/Github/IMT/rmarkdowns")
+
+#Load packages 
+library(tidyverse) ##install.packages("tidyverse")
+library(knitr)
+library(patchwork) ##install.packages("patchwork")
+library(skimr)     ##install.packages("skimr")
+library(readxl)
+library(janitor) ##install.packages("janitor")
+
+library(kableExtra) ##install.packages("kableExtra")
+library(webshot) ##install.packages("webshot")
+webshot::install_phantomjs()
+library(viridis) ##install.packages("viridis")
+library(lme4) ##install.packages("lme4")
+library(lmerTest) ##install.packages("lmerTest")
+library(emmeans) ##install.packages("emmeans")
+library(rstatix) ##install.packages("rstatix")
+#library(Matrix) ##install.packages("Matrix")
+library(multcomp) ##install.packages("multcomp")
+library(multcompView) ##install.packages("multcompView")
+library(ggResidpanel) ##install.packages("ggResidpanel")
+#library(car)
+#library(TMB)  ##install.packages("TMB")
+#library(glmmTMB)  ##install.packages("glmmTMB")
+#library(DHARMa)  ##install.packages("DHARMa")
+
+#Load Functions
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+
+<br>
+
+# **Load and Clean Data**
+### **Load individual datasets**
+```{r message=FALSE, warning=FALSE}
+
+
+fh_raw_2023 <- read_excel("~/Github/IMT/raw-data/farmhub_raw_2023.xlsx")
+kable(head(fh_raw_2023))
+
+cu_raw_2023 <- read_excel("~/Github/IMT/raw-data/cornell_raw_2023.xlsx") |> 
+   rename(WBM = TOTWBM, INTRAWBM = INTRABM, INTERWBM = INTERBM)
+kable(head(cu_raw_2023))
+
+me_raw_2023 <- read_excel("~/Github/IMT/raw-data/maine_raw_2023.xlsx", 
+                          na = c("na")) # convert na to NA
+kable(head(me_raw_2023))
+
+vt_raw_2023 <- read_excel("~/Github/IMT/raw-data/vermont_raw_2023.xlsx")
+kable(head(vt_raw_2023))
+
+wi_raw_2023 <- read_excel("~/Github/IMT/raw-data/wisconsin_raw_2023.xlsx")
+kable(head(wi_raw_2023))
+
+```
+
+
+### **Combine all datasets and clean**
+```{r}
+all_raw_2023 <- bind_rows(fh_raw_2023, cu_raw_2023, me_raw_2023, vt_raw_2023, wi_raw_2023)
+
+
+#Standardaze column names, convert to factors, check for outliers of variable**
+all_clean_2023 <- clean_names(all_raw_2023) |>  
+  rename ('mowing'= trt,'weeds'= microplot) |> 
+  mutate(across(c(mowing, block, plot, weeds, loc), as.factor)) |> 
+  mutate(is_outlier = wbm < (quantile(wbm, 0.25) - 1.5 * IQR(beanyd)) |
+                       wbm > (quantile(wbm, 0.75) + 1.5 * IQR(beanyd)))
+
+#select and convert data for wbm analysis
+  
+all_wbm_clean_2023 <-all_clean_2023 |>              
+  filter(is_outlier == FALSE) |>              # Keep rows where beanyd is not an outlier
+  filter(weeds %in% c("SW", "M")) |>       # Keep rows where SW and M are microplots
+  mutate(wbm_grams_meter = (wbm * 2)) |> 
+  mutate(wbm_kg_ha = ((wbm/0.5) *(10000))/(1000)) |>
+  mutate(wbm_lbs_ac = (((wbm/0.5) *(10000))/(1000))* 0.892179)
+kable(head(all_wbm_clean_2023)) 
+
+```
+<br>
+
+# **Assumptions**
+
+## **Levene's test**
+```{r}
+levene_test((wbm_kg_ha) ~ loc, data = all_wbm_clean_2023)
+```
+# **Model Testing**
+
+### **location random**
+
+```{r message=FALSE, warning=FALSE}
+#data should be log transformed due to zeroes
+
+all_wbm_random_2023 <- lmer(wbm_kg_ha ~  mowing*weeds + (1|loc) + (1|loc:block)+  (1|loc:block:mowing)  , data = all_wbm_clean_2023)
+
+resid_panel(all_wbm_random_2023)
+
+log_all_wbm_random_2023  <- lmer(log(wbm_kg_ha+1) ~  mowing*weeds + (1|loc) + (1|loc:block)+  (1|loc:block:mowing)  , data = all_wbm_clean_2023)
+
+resid_panel(log_all_wbm_random_2023)
+
+```
+
+### **location fixed**
+
+```{r}
+all_wbm_fixed_2023 <- lmer(wbm_kg_ha ~ loc*mowing*weeds + (1|loc:block)+  (1|loc:block:mowing), data = all_wbm_clean_2023)
+
+resid_panel(all_wbm_fixed_2023)
+
+log_all_wbm_fixed_2023 <- lmer(log(wbm_kg_ha+1) ~ loc*mowing*weeds + (1|loc:block)+  (1|loc:block:mowing), data = all_wbm_clean_2023)
+
+resid_panel(log_all_wbm_fixed_2023)
+```
+
+```{r}
+ all_wbm_fixed_2023 |> 
+  joint_tests() |> 
+  kable()  
+```
+<br>
+
+# **Means comparison of wbm**
+
+```{r message=FALSE}
+all_wbm_means_2023 <- 
+ emmeans(all_wbm_fixed_2023, ~ loc * mowing * weeds)
+# Optional: Adjust for multiple comparisons (e.g., using Tukey's method)
+
+pairwise_comparisons<- pairs(all_wbm_means_2023) 
+kable(head(pairwise_comparisons))
+```
+
+<br>
+
+### **Fisher's method for comparing means**
+
+```{r}
+#mowing
+cld_mowing_fisher <-cld(emmeans(all_wbm_fixed_2023, ~  mowing), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+cld_mowing_fisher
+
+#weeds
+cld_weeds_fisher <- cld(emmeans(all_wbm_fixed_2023, ~  weeds, type = ""), Letters = letters, sort = FALSE, adjust="none", reversed=TRUE)
+cld_weeds_fisher
+
+#mowing|weeds
+cld_mowing_weeds_fisher <-cld(emmeans(all_wbm_fixed_2023, ~  mowing|weeds, 
+                              type = "response"), Letters = letters, 
+                              sort = FALSE, adjust="none", reversed=FALSE)
+cld_mowing_weeds_fisher
+
+#mowing|weeds|loc
+cld_mowing_weeds_loc_fisher <-cld(emmeans(all_wbm_fixed_2023, ~  mowing|weeds|loc, type = "respons"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+cld_mowing_weeds_loc_fisher
+
+```
+<br>
+
+# **FIGURES**
+
+## **Mowing**
+
+```{r message=FALSE}
+all_wbm_clean_2023 |> 
+  left_join(cld_mowing_fisher) |> 
+  ggplot(aes(x = mowing, y = wbm_kg_ha, fill = mowing)) +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  labs(
+    x = "Timing of Mowing",
+    y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of interrow mowing on weed biomass"),
+    subtitle = expression(italic("P < 0.005"))) +
+  
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+ggsave("wbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
+```
