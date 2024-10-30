@@ -84,8 +84,8 @@ all_raw_2023 <- bind_rows(fh_raw_2023, cu_raw_2023, me_raw_2023, vt_raw_2023, wi
 all_clean_2023 <- clean_names(all_raw_2023) |>  
   rename ('mowing'= trt,'weeds'= microplot) |> 
   mutate(across(c(mowing, block, plot, weeds, loc), as.factor)) |> 
-  mutate(is_outlier = wbm < (quantile(wbm, 0.25) - 1.5 * IQR(beanyd)) |
-                       wbm > (quantile(wbm, 0.75) + 1.5 * IQR(beanyd)))
+  mutate(is_outlier = wbm < (quantile(wbm, 0.25) - 1.5 * IQR(wbm)) |
+                       wbm > (quantile(wbm, 0.75) + 1.5 * IQR(wbm)))
 
 #select and convert data for wbm analysis
   
