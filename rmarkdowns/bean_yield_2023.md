@@ -759,7 +759,7 @@ all_yield_clean_2023 |>
 ![](bean_yield_2023_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ``` r
-ggsave("yield_plot_mowing_weeds_loc.png", width = 30, height = 15, dpi = 300)
+ggsave("yield_plot_mowing_weeds_loc.png", width = 12, height = 6, dpi = 300)
 ```
 
 \`\`\`
