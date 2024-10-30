@@ -171,7 +171,7 @@ levene_test((wbm_kg_ha) ~ loc, data = all_wbm_clean_2023)
 ### **location random**
 
 ``` r
-#data needs to be log transformed due to zeroes
+#data should be log transformed due to zeroes
 
 all_wbm_random_2023 <- lmer(wbm_kg_ha ~  mowing*weeds + (1|loc) + (1|loc:block)+  (1|loc:block:mowing)  , data = all_wbm_clean_2023)
 
@@ -197,6 +197,12 @@ all_wbm_fixed_2023 <- lmer(wbm_kg_ha ~ loc*mowing*weeds + (1|loc:block)+  (1|loc
     ## boundary (singular) fit: see help('isSingular')
 
 ``` r
+resid_panel(all_wbm_fixed_2023)
+```
+
+![](weed_biomass_2023_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+``` r
 log_all_wbm_fixed_2023 <- lmer(log(wbm_kg_ha+1) ~ loc*mowing*weeds + (1|loc:block)+  (1|loc:block:mowing), data = all_wbm_clean_2023)
 ```
 
@@ -206,7 +212,7 @@ log_all_wbm_fixed_2023 <- lmer(log(wbm_kg_ha+1) ~ loc*mowing*weeds + (1|loc:bloc
 resid_panel(log_all_wbm_fixed_2023)
 ```
 
-![](weed_biomass_2023_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+![](weed_biomass_2023_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
 
 ``` r
  all_wbm_fixed_2023 |> 
@@ -302,7 +308,7 @@ cld_weeds_fisher
 #mowing|weeds
 cld_mowing_weeds_fisher <-cld(emmeans(all_wbm_fixed_2023, ~  mowing|weeds, 
                               type = "response"), Letters = letters, 
-                              sort = FALSE, adjust="none", reversed=FALSE)
+                              sort = TRUE, adjust="none", reversed=TRUE)
 ```
 
     ## NOTE: Results may be misleading due to involvement in interactions
@@ -313,17 +319,17 @@ cld_mowing_weeds_fisher
 
     ## weeds = M:
     ##  mowing emmean  SE  df lower.CL upper.CL .group
-    ##  AWC       354 120 118    116.0      593  a    
     ##  EWC       530 120 118    291.8      769  a    
-    ##  LWC       278 120 118     40.0      517  a    
+    ##  AWC       354 120 118    116.0      593  a    
     ##  NWC       311 120 118     72.6      549  a    
+    ##  LWC       278 120 118     40.0      517  a    
     ## 
     ## weeds = SW:
     ##  mowing emmean  SE  df lower.CL upper.CL .group
-    ##  AWC       750 120 118    512.0      989  ab   
-    ##  EWC       968 120 118    729.6     1206  a c  
-    ##  LWC       509 120 118    270.2      747   b   
-    ##  NWC      1274 120 118   1035.2     1512    c  
+    ##  NWC      1274 120 118   1035.2     1512  a    
+    ##  EWC       968 120 118    729.6     1206  ab   
+    ##  AWC       750 120 118    512.0      989   bc  
+    ##  LWC       509 120 118    270.2      747    c  
     ## 
     ## Results are averaged over the levels of: loc 
     ## Degrees-of-freedom method: kenward-roger 
@@ -450,4 +456,37 @@ all_wbm_clean_2023 |>
 
 ``` r
 ggsave("wbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
+```
+
+## **Mowing**
+
+``` r
+all_wbm_clean_2023 |> 
+  left_join(cld_mowing_weeds_fisher) |> 
+  ggplot(aes(x = mowing, y = wbm_kg_ha, fill = mowing)) +
+  facet_wrap(~weeds, labeller = labeller(weeds = c("M" = "Ambient weeds", "SW" = "Ambient + Surrogate weeds")))+
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  labs(
+    x = "Timing of Mowing",
+    y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of interrow mowing on weed biomass across weed levels"),
+    subtitle = expression(italic("P = 0.017"))) +
+  
+  scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+![](weed_biomass_2023_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+``` r
+ggsave("wbm_plot_mowing_weeds.png", width = 8, height = 6, dpi = 300)
 ```
