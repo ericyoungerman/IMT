@@ -311,6 +311,6 @@ all_yield_clean_2023 |>
     strip.background = element_blank(),
     strip.text = element_text(face = "bold", size = 12)
   )
-ggsave("yield_plot_mowing_weeds_loc.png", width = 30, height = 15, dpi = 300)
+ggsave("yield_plot_mowing_weeds_loc.png", width = 12, height = 6, dpi = 300)
 ```
 ```
