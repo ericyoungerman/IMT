@@ -192,7 +192,7 @@ cld_mowing_weeds_fisher <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds,
 cld_mowing_weeds_fisher
 
 #mowing|weeds|loc
-cld_mowing_weeds_loc_fisher <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds|loc, type = "respons"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+cld_mowing_weeds_loc_fisher <-cld(emmeans(all_yield_fixed_2023, ~  mowing|weeds|loc, type = "response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
 cld_mowing_weeds_loc_fisher
 
 ```

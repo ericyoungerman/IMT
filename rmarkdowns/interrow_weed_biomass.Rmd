@@ -188,7 +188,7 @@ all_interwbm_clean_2023 |>
     strip.background = element_blank(),
     strip.text = element_text(face = "bold", size = 12)
   )
-ggsave("wbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
+ggsave("interwbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
 ```
 
 

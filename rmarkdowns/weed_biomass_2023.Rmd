@@ -209,7 +209,7 @@ ggsave("wbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
 ```
 
 
-## **Mowing**
+## **Mowing|weeds**
 
 ```{r message=FALSE}
 all_wbm_clean_2023 |> 
