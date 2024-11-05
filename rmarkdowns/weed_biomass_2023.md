@@ -214,21 +214,23 @@ resid_panel(log_all_wbm_fixed_2023)
 
 ![](weed_biomass_2023_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
 
+\##**Joint test**
+
 ``` r
- all_wbm_fixed_2023 |> 
+ log_all_wbm_fixed_2023 |> 
   joint_tests() |> 
   kable()  
 ```
 
 |     | model term       | df1 | df2 | F.ratio |   p.value |
 |:----|:-----------------|----:|----:|--------:|----------:|
-| 1   | loc              |   4 |  15 |   7.713 | 0.0013871 |
-| 5   | mowing           |   3 |  45 |   4.978 | 0.0045600 |
-| 7   | weeds            |   1 |  60 |  37.499 | 0.0000001 |
-| 2   | loc:mowing       |  12 |  45 |   1.016 | 0.4509978 |
-| 4   | loc:weeds        |   4 |  60 |   8.152 | 0.0000256 |
-| 6   | mowing:weeds     |   3 |  60 |   3.667 | 0.0170660 |
-| 3   | loc:mowing:weeds |  12 |  60 |   0.945 | 0.5093560 |
+| 1   | loc              |   4 |  15 |  13.128 | 0.0000861 |
+| 5   | mowing           |   3 |  45 |   6.556 | 0.0008989 |
+| 7   | weeds            |   1 |  60 | 103.011 | 0.0000000 |
+| 2   | loc:mowing       |  12 |  45 |   1.497 | 0.1610209 |
+| 4   | loc:weeds        |   4 |  60 |  21.120 | 0.0000000 |
+| 6   | mowing:weeds     |   3 |  60 |   2.398 | 0.0768074 |
+| 3   | loc:mowing:weeds |  12 |  60 |   0.962 | 0.4940727 |
 
 <br>
 
@@ -499,7 +501,7 @@ all_wbm_clean_2023 |>
     x = "Timing of Mowing",
     y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
     title = str_c("The influence of interrow mowing on weed biomass across weed levels"),
-    subtitle = expression(italic("P = 0.017"))) +
+    subtitle = expression(italic("P = 0.007"))) +
   
   scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
