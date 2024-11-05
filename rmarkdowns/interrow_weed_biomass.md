@@ -124,22 +124,22 @@ all_clean_2023 <- clean_names(all_raw_2023) |>
 #select and convert data for wbm analysis
   
 all_interwbm_clean_2023 <-all_clean_2023 |>              
-  filter(is_outlier == FALSE) |>              # Keep rows where beanyd is not an outlier
+  #filter(is_outlier == FALSE) |>              # Keep rows where beanyd is not an outlier
   filter(weeds %in% c("SW", "M")) |>       # Keep rows where SW and M are microplots
-  mutate(interwbm_grams_meter = (wbm * 2)) |> 
-  mutate(interwbm_kg_ha = ((wbm/0.5) *(10000))/(1000)) |>
-  mutate(interwbm_lbs_ac = (((wbm/0.5) *(10000))/(1000))* 0.892179)
+  mutate(interwbm_grams_meter = (interwbm * 2)) |> 
+  mutate(interwbm_kg_ha = ((interwbm/0.5) *(10000))/(1000)) |>
+  mutate(interwbm_lbs_ac = (((interwbm/0.5) *(10000))/(1000))* 0.892179)
 kable(head(all_interwbm_clean_2023)) 
 ```
 
 | id | loc | mowing | block | plot | weeds | emerg | bbm | intrawbm | interwbm | wbm | den | beanyd | beanden | is_outlier | interwbm_grams_meter | interwbm_kg_ha | interwbm_lbs_ac |
 |:---|:---|:---|:---|:---|:---|---:|---:|---:|---:|---:|---:|---:|---:|:---|---:|---:|---:|
-| FH_B1_P101 | FH | EWC | 1 | 101 | M | 21 | 87.18 | 0.75 | 16.50 | 17.25 | 44 | 367.79 | NA | FALSE | 34.50 | 345.0 | 307.80176 |
-| FH_B1_P101_SW | FH | EWC | 1 | 101 | SW | 24 | 40.32 | 3.54 | 37.65 | 41.19 | 45 | 218.00 | NA | FALSE | 82.38 | 823.8 | 734.97706 |
-| FH_B1_P102 | FH | LWC | 1 | 102 | M | 24 | 72.37 | 6.47 | 12.71 | 19.18 | 52 | 268.00 | NA | FALSE | 38.36 | 383.6 | 342.23986 |
-| FH_B1_P102_SW | FH | LWC | 1 | 102 | SW | 24 | 63.33 | 7.54 | 11.33 | 18.87 | 49 | 177.30 | NA | FALSE | 37.74 | 377.4 | 336.70835 |
-| FH_B1_P103 | FH | AWC | 1 | 103 | M | 23 | 148.62 | 4.22 | 0.00 | 4.22 | 43 | 290.00 | NA | FALSE | 8.44 | 84.4 | 75.29991 |
-| FH_B1_P103_SW | FH | AWC | 1 | 103 | SW | 26 | 84.27 | 2.90 | 8.13 | 11.03 | 39 | 236.00 | NA | FALSE | 22.06 | 220.6 | 196.81469 |
+| FH_B1_P101 | FH | EWC | 1 | 101 | M | 21 | 87.18 | 0.75 | 16.50 | 17.25 | 44 | 367.79 | NA | FALSE | 33.00 | 330.0 | 294.4191 |
+| FH_B1_P101_SW | FH | EWC | 1 | 101 | SW | 24 | 40.32 | 3.54 | 37.65 | 41.19 | 45 | 218.00 | NA | FALSE | 75.30 | 753.0 | 671.8108 |
+| FH_B1_P102 | FH | LWC | 1 | 102 | M | 24 | 72.37 | 6.47 | 12.71 | 19.18 | 52 | 268.00 | NA | FALSE | 25.42 | 254.2 | 226.7919 |
+| FH_B1_P102_SW | FH | LWC | 1 | 102 | SW | 24 | 63.33 | 7.54 | 11.33 | 18.87 | 49 | 177.30 | NA | FALSE | 22.66 | 226.6 | 202.1678 |
+| FH_B1_P103 | FH | AWC | 1 | 103 | M | 23 | 148.62 | 4.22 | 0.00 | 4.22 | 43 | 290.00 | NA | FALSE | 0.00 | 0.0 | 0.0000 |
+| FH_B1_P103_SW | FH | AWC | 1 | 103 | SW | 26 | 84.27 | 2.90 | 8.13 | 11.03 | 39 | 236.00 | NA | FALSE | 16.26 | 162.6 | 145.0683 |
 
 <br>
 
@@ -154,7 +154,7 @@ levene_test((interwbm_kg_ha) ~ loc, data = all_interwbm_clean_2023)
     ## # A tibble: 1 × 4
     ##     df1   df2 statistic      p
     ##   <int> <int>     <dbl>  <dbl>
-    ## 1     3   116      2.30 0.0814
+    ## 1     3   124      2.94 0.0358
 
 # **Model Testing**
 
@@ -194,11 +194,7 @@ resid_panel(all_interwbm_fixed_2023)
 
 ``` r
 log_all_interwbm_fixed_2023 <- lmer(log(interwbm_kg_ha+1) ~ loc*mowing*weeds + (1|loc:block)+  (1|loc:block:mowing), data = all_interwbm_clean_2023)
-```
 
-    ## boundary (singular) fit: see help('isSingular')
-
-``` r
 resid_panel(log_all_interwbm_fixed_2023)
 ```
 
@@ -211,15 +207,15 @@ resid_panel(log_all_interwbm_fixed_2023)
   kable()  
 ```
 
-|     | model term       | df1 |   df2 | F.ratio |   p.value |
-|:----|:-----------------|----:|------:|--------:|----------:|
-| 1   | loc              |   3 | 10.70 |   7.640 | 0.0052162 |
-| 5   | mowing           |   3 | 31.87 |   5.090 | 0.0054247 |
-| 7   | weeds            |   1 | 48.39 |  89.022 | 0.0000000 |
-| 2   | loc:mowing       |   9 | 31.00 |   1.178 | 0.3428459 |
-| 4   | loc:weeds        |   3 | 41.72 |  11.997 | 0.0000085 |
-| 6   | mowing:weeds     |   3 | 42.62 |   1.216 | 0.3155917 |
-| 3   | loc:mowing:weeds |   9 | 41.72 |   0.952 | 0.4923260 |
+|     | model term       | df1 | df2 | F.ratio |   p.value |
+|:----|:-----------------|----:|----:|--------:|----------:|
+| 1   | loc              |   3 |  12 |   5.281 | 0.0149108 |
+| 5   | mowing           |   3 |  36 |   8.286 | 0.0002546 |
+| 7   | weeds            |   1 |  48 |  59.057 | 0.0000000 |
+| 2   | loc:mowing       |   9 |  36 |   1.666 | 0.1338704 |
+| 4   | loc:weeds        |   3 |  48 |  11.418 | 0.0000090 |
+| 6   | mowing:weeds     |   3 |  48 |   2.301 | 0.0890220 |
+| 3   | loc:mowing:weeds |   9 |  48 |   2.047 | 0.0540013 |
 
 <br>
 
@@ -227,7 +223,7 @@ resid_panel(log_all_interwbm_fixed_2023)
 
 ``` r
 #mowing
-cld_mowing_fisher <-cld(emmeans(all_interwbm_fixed_2023, ~  mowing), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+cld_mowing_fisher <-cld(emmeans(all_interwbm_fixed_2023, ~  mowing,type = "response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
 ```
 
     ## NOTE: Results may be misleading due to involvement in interactions
@@ -237,10 +233,10 @@ cld_mowing_fisher
 ```
 
     ##  mowing emmean   SE   df lower.CL upper.CL .group
-    ##  NWC       607 66.4 58.7      474      740  a    
-    ##  EWC       562 57.3 46.3      447      677  a    
-    ##  AWC       376 55.1 42.9      265      487   b   
-    ##  LWC       275 54.0 41.1      166      384   b   
+    ##  NWC       621 63.6 39.8    492.1      749  a    
+    ##  EWC       439 63.6 39.8    310.7      568   b   
+    ##  AWC       203 63.6 39.8     73.9      331    c  
+    ##  LWC       154 63.6 39.8     25.3      283    c  
     ## 
     ## Results are averaged over the levels of: loc, weeds 
     ## Degrees-of-freedom method: kenward-roger 
@@ -252,7 +248,7 @@ cld_mowing_fisher
 
 ``` r
 #weeds
-cld_weeds_fisher <- cld(emmeans(all_interwbm_fixed_2023, ~  weeds, type = ""), Letters = letters, sort = FALSE, adjust="none", reversed=TRUE)
+cld_weeds_fisher <- cld(emmeans(all_interwbm_fixed_2023, ~  weeds, type = "response"), Letters = letters, sort = FALSE, adjust="none", reversed=TRUE)
 ```
 
     ## NOTE: Results may be misleading due to involvement in interactions
@@ -261,9 +257,9 @@ cld_weeds_fisher <- cld(emmeans(all_interwbm_fixed_2023, ~  weeds, type = ""), L
 cld_weeds_fisher
 ```
 
-    ##  weeds emmean   SE   df lower.CL upper.CL .group
-    ##  M        188 40.0 27.6      106      270   b   
-    ##  SW       722 45.7 39.3      630      815  a    
+    ##  weeds emmean   SE df lower.CL upper.CL .group
+    ##  M        147 50.5 23     42.5      252   b   
+    ##  SW       561 50.5 23    456.7      666  a    
     ## 
     ## Results are averaged over the levels of: loc, mowing 
     ## Degrees-of-freedom method: kenward-roger 
@@ -287,18 +283,18 @@ cld_mowing_weeds_fisher
 ```
 
     ## weeds = M:
-    ##  mowing emmean    SE   df lower.CL upper.CL .group
-    ##  EWC       263  74.5 86.6    114.5      411  a    
-    ##  NWC       185  74.5 86.6     36.6      333  a    
-    ##  AWC       181  74.5 86.6     33.0      329  a    
-    ##  LWC       122  74.5 86.6    -26.0      270  a    
+    ##  mowing emmean   SE   df lower.CL upper.CL .group
+    ##  EWC     227.6 83.9 82.9    60.69      395  a    
+    ##  NWC     170.7 83.9 82.9     3.81      338  a    
+    ##  AWC     114.6 83.9 82.9   -52.32      281  a    
+    ##  LWC      75.3 83.9 82.9   -91.61      242  a    
     ## 
     ## weeds = SW:
-    ##  mowing emmean    SE   df lower.CL upper.CL .group
-    ##  NWC      1029 107.0 88.0    816.2     1242  a    
-    ##  EWC       862  83.9 87.4    694.8     1028  a    
-    ##  AWC       571  77.8 86.9    416.7      726   b   
-    ##  LWC       427  74.5 86.6    279.0      575   b   
+    ##  mowing emmean   SE   df lower.CL upper.CL .group
+    ##  NWC    1070.8 83.9 82.9   903.93     1238  a    
+    ##  EWC     651.2 83.9 82.9   484.27      818   b   
+    ##  AWC     290.5 83.9 82.9   123.63      457    c  
+    ##  LWC     232.5 83.9 82.9    65.63      399    c  
     ## 
     ## Results are averaged over the levels of: loc 
     ## Degrees-of-freedom method: kenward-roger 
@@ -315,60 +311,60 @@ cld_mowing_weeds_loc_fisher
 ```
 
     ## weeds = M, loc = CU:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  AWC     427.2 149 86.6    131.1      723  a    
-    ##  NWC     406.2 149 86.6    110.1      702  a    
-    ##  EWC     405.6 149 86.6    109.4      702  a    
-    ##  LWC     324.8 149 86.6     28.6      621  a    
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  NWC     349.40 168 82.9     15.6      683  a    
+    ##  AWC     300.50 168 82.9    -33.3      634  a    
+    ##  EWC     291.30 168 82.9    -42.5      625  a    
+    ##  LWC     173.35 168 82.9   -160.5      507  a    
     ## 
     ## weeds = SW, loc = CU:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  EWC    1365.1 149 86.6   1068.9     1661  a    
-    ##  NWC    1088.0 149 86.6    791.8     1384  a    
-    ##  LWC     562.8 149 86.6    266.6      859   b   
-    ##  AWC     552.8 149 86.6    256.6      849   b   
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  NWC     760.15 168 82.9    426.3     1094  a    
+    ##  EWC     758.35 168 82.9    424.5     1092  a    
+    ##  LWC     273.60 168 82.9    -60.2      607   b   
+    ##  AWC      92.35 168 82.9   -241.5      426   b   
     ## 
     ## weeds = M, loc = FH:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  EWC     252.2 149 86.6    -44.0      548  a    
-    ##  LWC     128.8 149 86.6   -167.4      425  a    
-    ##  NWC      83.0 149 86.6   -213.2      379  a    
-    ##  AWC      32.2 149 86.6   -263.9      328  a    
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  EWC     233.80 168 82.9   -100.0      568  a    
+    ##  LWC      94.85 168 82.9   -239.0      429  a    
+    ##  NWC      82.95 168 82.9   -250.9      417  a    
+    ##  AWC       6.65 168 82.9   -327.2      340  a    
     ## 
     ## weeds = SW, loc = FH:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  EWC     671.4 149 86.6    375.2      968  a    
-    ##  NWC     605.0 149 86.6    308.9      901  ab   
-    ##  LWC     208.9 149 86.6    -87.2      505   bc  
-    ##  AWC     174.1 149 86.6   -122.1      470    c  
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  EWC     635.55 168 82.9    301.7      969  a    
+    ##  NWC     485.20 168 82.9    151.4      819  ab   
+    ##  LWC     118.65 168 82.9   -215.2      452   b   
+    ##  AWC      89.40 168 82.9   -244.4      423   b   
     ## 
     ## weeds = M, loc = VT:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  EWC     286.0 149 86.6    -10.2      582  a    
-    ##  NWC     240.5 149 86.6    -55.7      537  a    
-    ##  AWC     239.0 149 86.6    -57.2      535  a    
-    ##  LWC      35.0 149 86.6   -261.2      331  a    
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  EWC     280.50 168 82.9    -53.3      614  a    
+    ##  NWC     240.50 168 82.9    -93.3      574  a    
+    ##  AWC     127.00 168 82.9   -206.8      461  a    
+    ##  LWC      33.00 168 82.9   -300.8      367  a    
     ## 
     ## weeds = SW, loc = VT:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  NWC     714.4 215 88.0    288.0     1141  a    
-    ##  AWC     483.0 174 87.5    138.0      828  ab   
-    ##  EWC     355.5 149 86.6     59.3      652  ab   
-    ##  LWC     160.0 149 86.6   -136.2      456   b   
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  NWC    1072.50 168 82.9    738.7     1406  a    
+    ##  AWC     547.50 168 82.9    213.7      881   b   
+    ##  EWC      88.50 168 82.9   -245.3      422    c  
+    ##  LWC      77.00 168 82.9   -256.8      411    c  
     ## 
     ## weeds = M, loc = WI:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  EWC     106.8 149 86.6   -189.4      403  a    
-    ##  AWC      25.8 149 86.6   -270.4      322  a    
-    ##  NWC       9.2 149 86.6   -287.0      305  a    
-    ##  LWC       0.0 149 86.6   -296.2      296  a    
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  EWC     104.80 168 82.9   -229.0      439  a    
+    ##  AWC      24.20 168 82.9   -309.6      358  a    
+    ##  NWC      10.00 168 82.9   -323.8      344  a    
+    ##  LWC       0.00 168 82.9   -333.8      334  a    
     ## 
     ## weeds = SW, loc = WI:
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  NWC    1709.9 306 87.9   1101.9     2318  a    
-    ##  AWC    1075.3 149 86.6    779.1     1371  ab   
-    ##  EWC    1054.0 214 88.0    627.8     1480  ab   
-    ##  LWC     776.6 149 86.6    480.4     1073   b   
+    ##  mowing  emmean  SE   df lower.CL upper.CL .group
+    ##  NWC    1965.50 168 82.9   1631.7     2299  a    
+    ##  EWC    1122.30 168 82.9    788.5     1456   b   
+    ##  LWC     460.90 168 82.9    127.1      795    c  
+    ##  AWC     432.90 168 82.9     99.1      767    c  
     ## 
     ## Degrees-of-freedom method: kenward-roger 
     ## Confidence level used: 0.95 
@@ -390,8 +386,8 @@ all_interwbm_clean_2023 |>
   stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
   labs(
     x = "Timing of Mowing",
-    y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
-    title = str_c("The influence of interrow mowing on weed biomass"),
+    y = expression("Interrow weed biomass" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of interrow mowing on interrow weed biomass"),
     subtitle = expression(italic("P < 0.005"))) +
   
   scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
@@ -408,24 +404,27 @@ all_interwbm_clean_2023 |>
 ![](interrow_weed_biomass_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ``` r
-ggsave("wbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
+ggsave("interwbm_plot_mowing.png", width = 8, height = 6, dpi = 300)
 ```
 
-## **Mowing\|weeds**
+## **mowing\|weeds\|loc**
 
 ``` r
 all_interwbm_clean_2023 |> 
-  left_join(cld_mowing_weeds_fisher) |> 
+  left_join(cld_mowing_weeds_loc_fisher) |> 
   ggplot(aes(x = mowing, y = interwbm_kg_ha, fill = mowing)) +
-  facet_wrap(~weeds, labeller = labeller(weeds = c("M" = "Ambient weeds", "SW" = "Ambient + Surrogate weeds")))+
+  facet_grid(weeds ~ loc, labeller = labeller(
+    loc = c("CU" = "Aurora, NY", "FH" = "Hurley, NY", "ME" = "Orono, ME", "VT" = "Alburgh, VT", "WI" = "Arlington, WI"),
+    weeds = c("M" = "Ambient Weeds", "SW" = "Ambient + Surrogate Weeds")
+  )) +
   stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
   labs(
     x = "Timing of Mowing",
-    y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
-    title = str_c("The influence of interrow mowing on weed biomass across weed levels"),
-    subtitle = expression(italic("P = 0.017"))) +
+    y = expression("Interrow weed biomass" ~ (kg ~ ha^{-1})),
+    title = str_c("The influence of interrow mowing on interrow weed biomass"),
+    subtitle = expression(italic("P = 0.054"))) +
   
   scale_x_discrete(labels = c("As-needed\nmowing", "Early\nmowing", "Late\nmowing", "No\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
@@ -441,5 +440,5 @@ all_interwbm_clean_2023 |>
 ![](interrow_weed_biomass_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ``` r
-ggsave("wbm_plot_mowing_weeds.png", width = 8, height = 6, dpi = 300)
+ggsave("interwbm_plot_mowing_weeds_loc.png", width = 12, height = 6, dpi = 300)
 ```
