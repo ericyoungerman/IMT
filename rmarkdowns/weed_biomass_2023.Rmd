@@ -90,7 +90,7 @@ all_clean_2023 <- clean_names(all_raw_2023) |>
 #select and convert data for wbm analysis
   
 all_wbm_clean_2023 <-all_clean_2023 |>              
-  filter(is_outlier == FALSE) |>              # Keep rows where beanyd is not an outlier
+  #filter(is_outlier == FALSE) |>              # Keep rows where beanyd is not an outlier
   filter(weeds %in% c("SW", "M")) |>       # Keep rows where SW and M are microplots
   mutate(wbm_grams_meter = (wbm * 2)) |> 
   mutate(wbm_kg_ha = ((wbm/0.5) *(10000))/(1000)) |>
@@ -159,8 +159,13 @@ kable(head(pairwise_comparisons))
 
 ```{r}
 #mowing
-cld_mowing_fisher <-cld(emmeans(all_wbm_fixed_2023, ~  mowing), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+cld_mowing_fisher <-cld(emmeans(all_wbm_fixed_2023, ~  mowing, type = "response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
 cld_mowing_fisher
+
+
+log_cld_mowing_fisher <- cld(emmeans(log_all_wbm_fixed_2023, ~  mowing, type = "response"), Letters = letters, sort = TRUE, adjust="none", reversed=TRUE)
+log_cld_mowing_fisher
+  
 
 #weeds
 cld_weeds_fisher <- cld(emmeans(all_wbm_fixed_2023, ~  weeds, type = ""), Letters = letters, sort = FALSE, adjust="none", reversed=TRUE)
