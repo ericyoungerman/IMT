@@ -1,0 +1,223 @@
+---
+title: "IMT Bean yield"
+output: github_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries
+
+```{r message=FALSE, warning=FALSE}
+
+#Set work directory
+setwd("/Users/ey239/Github/IMT/rmarkdowns")
+
+#Load packages 
+library(tidyverse) ##install.packages("tidyverse")
+library(knitr)
+library(patchwork) ##install.packages("patchwork")
+library(skimr)     ##install.packages("skimr")
+library(readxl)
+library(janitor) ##install.packages("janitor")
+
+library(kableExtra) ##install.packages("kableExtra")
+library(webshot) ##install.packages("webshot")
+webshot::install_phantomjs()
+library(viridis) ##install.packages("viridis")
+library(lme4) ##install.packages("lme4")
+library(lmerTest) ##install.packages("lmerTest")
+library(emmeans) ##install.packages("emmeans")
+library(rstatix) ##install.packages("rstatix")
+#library(Matrix) ##install.packages("Matrix")
+library(multcomp) ##install.packages("multcomp")
+library(multcompView) ##install.packages("multcompView")
+library(ggResidpanel) ##install.packages("ggResidpanel")
+#library(car)
+#library(TMB)  ##install.packages("TMB")
+library(glmmTMB)  ##install.packages("glmmTMB")
+library(DHARMa)  ##install.packages("DHARMa")
+library(performance) ##install.packages("performance")
+#Load Functions
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+
+
+<br>
+
+# Load and clean data
+
+## Load data
+
+``` {r}
+combined_raw <- read_excel("~/Github/IMT/raw-data/combined_raw.xlsx")
+kable(head(combined_raw))
+
+```
+
+```{r}
+combined_raw |> group_by(treatment) |> summarise(averagewb = mean(weed_biomas),mean(interrow_weed_biomass))
+
+```
+
+
+##Clean data
+
+```{r}
+#Standardaze column names, convert to factors, check for outliers of variable**
+clean_combined <- clean_names(combined_raw) |>  
+  rename(mowing = treatment, weeds = microplot) |> 
+  mutate(across(c(year, location, site_year, mowing, block, plot, weeds), as.factor),
+         bean_yield = as.numeric(as.character(bean_yield))) |>  # Convert to numeric
+  mutate(is_outlier = bean_yield < (quantile(bean_yield, 0.25, na.rm = TRUE) - 1.5 * IQR(bean_yield, na.rm = TRUE)) |
+                     bean_yield > (quantile(bean_yield, 0.75, na.rm = TRUE) + 1.5 * IQR(bean_yield, na.rm = TRUE))) |> 
+  mutate(is_outlier = replace_na(is_outlier, FALSE))  # Ensure logical values
+
+bean_yield_clean <- clean_combined |>  
+  filter(weeds %in% c("SW", "M")) |>  # Keep only SW and M microplots
+  filter(!is.na(bean_yield)) |>  # Remove NA values
+  filter(is_outlier == FALSE) |>  # Remove outliers
+  mutate(
+    bean_yield_adj_bu_acre = (((bean_yield / 454) / (16.4 / 43560)) / 60) * ((100 - 0.00001) / (100 - 14)),
+    bean_yield_adj_lbs_acre = ((bean_yield / 454) / (16.4 / 43560)) * ((100 - 0.00001) / (100 - 14)),
+    bean_yield_adj_kg_ha = ((bean_yield / 454) / (16.4 / 43560)) * 1.12085 * ((100 - 0.00001) / (100 - 14))
+  )
+kable(head(bean_yield_clean)) 
+
+```
+
+# Model testing
+## Lmer
+Block is random
+Tyler is under the impression that block should always be random and that post-hoc comparisons should use TUKEY rather the Fischer. Fisher is bogus apparently. 
+
+```{r}
+
+# This is better for providing generalizatins and reccomendations. 
+
+random <- lmer(bean_yield_adj_kg_ha  ~ mowing*weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing)  , data =  bean_yield_clean)
+
+
+#tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
+
+random_uri <- lmer(bean_yield_adj_kg_ha  ~ mowing*weeds + location*year + (1|site_year:block)+  (1|site_year:block:mowing)  , data =  bean_yield_clean)
+
+
+resid_panel(random_uri)
+
+simulateResiduals(random,plot = TRUE) # Residuals and normality look good
+check_model(random)
+```
+
+```{r}
+#tyler whats up with uri being random?
+random_uri <- lmer(bean_yield_adj_kg_ha  ~ mowing*weeds + site*year + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing)  , data =  bean_yield_clean)
+
+```
+
+## Joint test (anova)
+```{r}
+ random |> 
+  joint_tests() |> 
+  kable()  
+```
+#### Anova table
+```{r}
+options(contrasts = c("contr.sum", "contr.poly"))
+Anova(random, type = 3)
+```
+# Fisher compact letter display
+### Weed-control (No significant)
+
+```{r}
+cld_mowing_fisher <-cld(emmeans(random, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_mowing_fisher
+```
+### Weed-control by site_year (No significant)
+
+### weeds (significant)
+
+```{r}
+cld_weeds_fisher <-cld(emmeans(random, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_weeds_fisher
+```
+
+#Figures
+## Weed-control (S)
+
+```{r message=FALSE}
+bean_yield_clean |> 
+  left_join(cld_mowing_fisher) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_kg_ha, fill = mowing)) +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  #geom_bar(stat="identity", position=position_dodge()) + 
+  #geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 #position=position_dodge(.9))+
+#geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
+  labs(
+    x = "",
+       y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    subtitle = expression(italic("Not signficant"))) +
+  
+  scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 24),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  
+  )
+ggsave("bean_yield_mowing_kgha.png", width = 10, height = 8, dpi = 300)
+```
+
+## Weeds (S)
+
+```{r message=FALSE}
+bean_yield_clean |> 
+  left_join(cld_weeds_fisher) |> 
+  ggplot(aes(x = weeds, y = bean_yield_adj_bu_acre, fill = weeds))  +
+  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  #geom_bar(stat="identity", position=position_dodge()) + 
+  #geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 #position=position_dodge(.9))+
+#geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
+  labs(
+    x = "",
+       y = expression(paste("Dry bean yield (", bu, "/", a, " at 13% moisture)")),
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    subtitle = expression(italic("Not signficant"))) +
+  
+  scale_x_discrete(labels = c("Surrogate", "Ambient")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 20),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 20),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  
+  )
+ggsave("bean_yield_weeds_site_year_lbsac.png", width = 25, height = 10, dpi = 300)
+```

@@ -1,7 +1,8 @@
 ---
-title: "Interrow weed biomass"
+title: "Weed biomass"
 output: github_document
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -45,8 +46,8 @@ find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
 d=exp(c)
 return(d)}
 ```
-<br>
 
+<br>
 
 # Load and clean data
 
@@ -58,30 +59,28 @@ kable(head(combined_raw))
 
 ```
 
-
 ##Clean data
 
 ```{r}
 #Standardaze column names, convert to factors, check for outliers of variable**
 clean_combined <- clean_names(combined_raw) |>  
   rename ('mowing'= treatment,'weeds'= microplot) |> 
-  mutate(across(c(year, location, site_year, mowing, block, plot, weeds, ), as.factor),interrow_weed_biomass = as.numeric(as.character(interrow_weed_biomass)))  
+  mutate(across(c(year, location, site_year, mowing, block, plot, weeds, ), as.factor)) 
 
 #select and convert data for wbm analysis
-interrow_weed_biomass_clean <-clean_combined |>             
+weed_biomass_clean <-clean_combined |>             
   filter(weeds %in% c("SW", "M")) |>  # Keep rows where SW and M are microplots
-  filter(location %in% c("WI", "VT", "FH", "CU")) |>  # Keep rows where WI, VT, FH, and CU and M are locations
-  mutate(interrow_weed_biomass_grams_meter = (interrow_weed_biomass /0.5)) |> 
-  mutate(interrow_weed_biomass_kg_ha = (interrow_weed_biomass_grams_meter *(10000))/(1000)) |>
-  mutate(interrow_weed_biomass_lbs_ac = ((interrow_weed_biomass_grams_meter *(10000))/(1000))* 0.892179)
-kable(head(interrow_weed_biomass_clean)) 
+  mutate(weed_biomass_grams_meter = (weed_biomass /0.5)) |> 
+  mutate(weed_biomass_kg_ha = (weed_biomass_grams_meter *(10000))/(1000)) |>
+  mutate(weed_biomass_lbs_ac = ((weed_biomass_grams_meter *(10000))/(1000))* 0.892179)
+kable(head(weed_biomass_clean)) 
 ```
 #GLMM
 
 ```{r}
 
-model_tweedie_log <- glmmTMB(interrow_weed_biomass_lbs_ac ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
-  data = interrow_weed_biomass_clean, 
+model_tweedie_log <- glmmTMB(weed_biomass_kg_ha ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
+  data = weed_biomass_clean, 
   family = tweedie(link = "log")
 
 )
@@ -99,6 +98,7 @@ VarCorr(model_tweedie_log )
 
 
 ```
+
 #### Joint test (anova)
 ```{r}
 model_tweedie_log |> 
@@ -106,38 +106,38 @@ model_tweedie_log |>
   kable()  
 ```
 
-<br>
-
-#### Anova table
 ```{r}
 options(contrasts = c("contr.sum", "contr.poly"))
 Anova(model_tweedie_log, type = 3)
 ```
+
+<br>
 
 ## Fisher compact letter display
 #### Mowing (Significant)
 
 ```{r}
 cld_mowing_fisher <-cld(emmeans(model_tweedie_log, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weed_control_fisher
+cld_mowing_fisher
 
 
 ```
-#### Weeds (Significant)
+
+### Weeds (Significant)
 
 ```{r}
-cld_location_fisher <-cld(emmeans(model_tweedie_log, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weed_control_fisher
+cld_weeds_fisher <-cld(emmeans(model_tweedie_log, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_weeds_fisher
 
 
 ```
 
- Figures
-## Weed-control (S)
+# Figures
+## Mowing (Significant)
 
 ```{r message=FALSE}
-interrow_weed_biomass_clean |> 
-  left_join(cld_weed_control_fisher) |> 
+weed_biomass_clean |> 
+  left_join(cld_mowing_fisher) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
   #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
@@ -145,10 +145,10 @@ interrow_weed_biomass_clean |>
   geom_bar(stat="identity", position=position_dodge()) + 
   geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
                  position=position_dodge(.9))+
-geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
+geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
   labs(
     x = "",
-     y = expression("Interrow weed biomass" ~ (lbs * "/" * a)),
+     y = expression("Weed biomass" ~ (kg~ha^{-1})),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("P < 0.005"))) +
   
@@ -164,7 +164,6 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
     axis.text = element_text(size = 24),   # Increase font size of axis labels
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
-  
   )
-ggsave("interrow_weed_biomass_mowing_lbsacre.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_mowing_kghec.png", width = 10, height = 8, dpi = 300)
 ```

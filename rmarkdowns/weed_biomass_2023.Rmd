@@ -191,11 +191,16 @@ cld_mowing_weeds_loc_fisher
 
 ```{r message=FALSE}
 all_wbm_clean_2023 |> 
-  left_join(cld_mowing_fisher) |> 
-  ggplot(aes(x = mowing, y = wbm_kg_ha, fill = mowing)) +
-  stat_summary(geom = "bar", fun = "mean", width = 0.7) +
-  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
-  stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  left_join(log_cld_mowing_fisher) |> 
+  ggplot(aes(x = mowing, y = response, fill = mowing)) +
+  #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+ # stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  geom_bar(stat="identity", 
+           position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+   geom_text(aes(label = trimws(.group), size=6.5, y = response +(SE+20)))+
   labs(
     x = "Timing of Mowing",
     y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
@@ -242,3 +247,4 @@ all_wbm_clean_2023 |>
   )
 ggsave("wbm_plot_mowing_weeds.png", width = 8, height = 6, dpi = 300)
 ```
+

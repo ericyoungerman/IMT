@@ -119,7 +119,7 @@ Anova(model_tweedie_log, type = 3)
 
 ```{r}
 cld_mowing_fisher <-cld(emmeans(model_tweedie_log, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weed_control_fisher
+cld_mowing_fisher
 
 
 ```
@@ -127,7 +127,7 @@ cld_weed_control_fisher
 
 ```{r}
 cld_location_fisher <-cld(emmeans(model_tweedie_log, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weed_control_fisher
+cld_location_fisher
 
 
 ```
@@ -137,7 +137,7 @@ cld_weed_control_fisher
 
 ```{r message=FALSE}
 interrow_weed_biomass_clean |> 
-  left_join(cld_weed_control_fisher) |> 
+  left_join(cld_mowing_fisher) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
   #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
