@@ -20,8 +20,7 @@ library(dplyr)
 library(ggmap)
 ```
 ```{r}
-# Register for Google API key
-register_google(key = "AIzaSyD5Va-phHl3SFp2YsVFiXrN42W2R8g00c0")
+
 ```
 ```{r}
 # Define and geocode the locations
