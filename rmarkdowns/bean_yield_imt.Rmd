@@ -80,7 +80,7 @@ clean_combined <- clean_names(combined_raw) |>
 
 bean_yield_clean <- clean_combined |>  
   filter(weeds %in% c("SW", "M")) |> # Keep only SW and M microplots
-  filter(location %in% c("FH")) |>
+  filter(location %in% c("FH", "CU")) |>
   filter(!is.na(bean_yield)) |>  # Remove NA values
   filter(is_outlier == FALSE) |>  # Remove outliers
   mutate(
@@ -101,7 +101,7 @@ Tyler is under the impression that block should always be random and that post-h
 
 # This is better for providing generalizatins and reccomendations. 
 
-random <- lmer(bean_yield_adj_kg_ha ~ mowing*weeds + (1|year) + (1|block) + (1|block:mowing), data = bean_yield_clean)
+random <- lmer(   bean_yield_adj_bu_acre ~ mowing*weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
 
 
 #tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
@@ -154,7 +154,7 @@ cld_weeds_fisher
 ```{r message=FALSE}
 bean_yield_clean |> 
   left_join(cld_mowing_fisher) |> 
-  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_kg_ha, fill = mowing)) +
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_bu_acre, fill = mowing)) +
   stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
@@ -164,7 +164,7 @@ bean_yield_clean |>
 #geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
   labs(
     x = "",
-       y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
+       y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("Not signficant"))) +
   
@@ -189,21 +189,19 @@ ggsave("bean_yield_mowing_kgha.png", width = 10, height = 8, dpi = 300)
 bean_yield_clean |> 
   left_join(cld_mowing_fisher) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), 
-             y = bean_yield_adj_kg_ha, fill = factor(year))) +  # Fill by year
-  stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
-  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
+             y = bean_yield_adj_bu_acre, fill = mowing)) + 
+  stat_summary(geom = "bar", fun = "mean", width = 0.6) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
-    fill = "Year",  # Legend title
-    #subtitle = expression(italic("Not significant"))
+    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)"))
   ) +
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
-  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Use wren's bookshelf colors
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  
   theme_bw() +
   theme(
-    legend.position = "right",
+    legend.position = "none",
     strip.background = element_blank(),
     strip.text = element_text(face = "bold", size = 12),
     axis.title = element_text(size = 24),
@@ -219,17 +217,17 @@ ggsave("bean_yield_mowing_kgha_FH.png", width = 10, height = 8, dpi = 300)
 ```{r message=FALSE}
 bean_yield_clean |> 
   left_join(cld_weeds_fisher) |> 
-  ggplot(aes(x = weeds, y = bean_yield_adj_kg_ha, fill = weeds)) +  # Fill added
+  ggplot(aes(x = weeds, y = bean_yield_adj_bu_acre, fill = weeds)) +  # Fill added
   stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), 
                size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
+    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
     fill = "Weed Treatment"
   ) +
-  scale_x_discrete(labels = c("Ambient weeds", "Surrogate weeds")) +
+  scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Ensure correct function use
   theme_bw() +

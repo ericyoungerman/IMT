@@ -82,7 +82,7 @@ clean_combined <- clean_names(combined_raw) |>
 ``` r
 bean_yield_clean <- clean_combined |>  
   filter(weeds %in% c("SW", "M")) |> # Keep only SW and M microplots
-  filter(location %in% c("FH")) |>
+  filter(location %in% c("FH", "CU")) |>
   filter(!is.na(bean_yield)) |>  # Remove NA values
   filter(is_outlier == FALSE) |>  # Remove outliers
   mutate(
@@ -153,6 +153,70 @@ kable(bean_yield_clean)
 | FH_B1_P403 | 2024 | FH | FH_2024 | NWC | 4 | 403 | M | 23 | 185.37 | 0 | 95.34 | 95.34 | 24 | 242.45 | FALSE | 27.489106 | 1649.3464 | 1848.6699 |
 | FH_B1_P403_SW | 2024 | FH | FH_2024 | NWC | 4 | 403 | SW | 19 | 119.05 | 11.54 | 121.29 | 132.83 | 20 | 183.22 | FALSE | 20.773578 | 1246.4147 | 1397.0439 |
 | FH_B1_P404 | 2024 | FH | FH_2024 | EWC | 4 | 404 | M | 30 | 194.11 | 0 | 45.72 | 45.72 | 24 | 277.00 | FALSE | 31.406403 | 1884.3842 | 2112.1120 |
+| CU_B1_P101 | 2023 | CU | CU_2023 | EWC | 1 | 101 | M | 22 | 91.99 | 9.39 | 20.64 | 30.03 | 19 | 222.00 | FALSE | 25.170474 | 1510.2285 | 1692.7396 |
+| CU_B1_P101_SW | 2023 | CU | CU_2023 | EWC | 1 | 101 | SW | 19 | 71.80 | 22.33 | 19.62 | 41.95 | 16 | 299.00 | FALSE | 33.900774 | 2034.0464 | 2279.8610 |
+| CU_B1_P102 | 2023 | CU | CU_2023 | LWC | 1 | 102 | M | 22 | 83.84 | 7.23 | 14.75 | 21.98 | 22 | 472.00 | FALSE | 53.515603 | 3210.9362 | 3598.9778 |
+| CU_B1_P102_SW | 2023 | CU | CU_2023 | LWC | 1 | 102 | SW | 26 | 81.23 | 13.07 | 9.65 | 22.72 | 17 | 307.00 | FALSE | 34.807818 | 2088.4691 | 2340.8606 |
+| CU_B1_P103 | 2023 | CU | CU_2023 | AWC | 1 | 103 | M | 21 | 109.21 | 6.67 | 11.28 | 17.95 | 25 | 456.00 | FALSE | 51.701515 | 3102.0909 | 3476.9786 |
+| CU_B1_P103_SW | 2023 | CU | CU_2023 | AWC | 1 | 103 | SW | 28 | 152.43 | 10.51 | 3.54 | 14.05 | 22 | 446.00 | FALSE | 50.567710 | 3034.0626 | 3400.7290 |
+| CU_B1_P104 | 2023 | CU | CU_2023 | NWC | 1 | 104 | M | 28 | 122.15 | 5.52 | 21.38 | 26.90 | 18 | 244.00 | FALSE | 27.664846 | 1659.8907 | 1860.4885 |
+| CU_B1_P104_SW | 2023 | CU | CU_2023 | NWC | 1 | 104 | SW | 15 | 78.65 | 18.02 | 50.58 | 68.60 | 21 | 357.00 | FALSE | 40.476844 | 2428.6106 | 2722.1082 |
+| CU_B1_P201 | 2023 | CU | CU_2023 | AWC | 2 | 201 | M | 25 | 152.65 | 6.06 | 0.24 | 6.30 | 18 | 406.00 | FALSE | 46.032489 | 2761.9493 | 3095.7309 |
+| CU_B1_P201_SW | 2023 | CU | CU_2023 | AWC | 2 | 201 | SW | 15 | 52.27 | 20.09 | 4.62 | 24.71 | 19 | 203.00 | FALSE | 23.016244 | 1380.9747 | 1547.8655 |
+| CU_B1_P202 | 2023 | CU | CU_2023 | NWC | 2 | 202 | M | 24 | 137.92 | 3.45 | 14.88 | 18.33 | 17 | 372.00 | FALSE | 42.177552 | 2530.6531 | 2836.4825 |
+| CU_B1_P202_SW | 2023 | CU | CU_2023 | NWC | 2 | 202 | SW | 19 | 70.96 | 16.07 | 27.49 | 43.56 | 19 | 270.00 | FALSE | 30.612739 | 1836.7643 | 2058.7373 |
+| CU_B1_P203 | 2023 | CU | CU_2023 | EWC | 2 | 203 | M | 19 | 98.47 | 3.53 | 9.9700000000000006 | 13.50 | 18 | 418.00 | FALSE | 47.393055 | 2843.5833 | 3187.2304 |
+| CU_B1_P203_SW | 2023 | CU | CU_2023 | EWC | 2 | 203 | SW | 15 | 28.82 | 43.18 | 50.41 | 93.59 | 13 | 297.00 | FALSE | 33.674013 | 2020.4408 | 2264.6110 |
+| CU_B1_P204 | 2023 | CU | CU_2023 | LWC | 2 | 204 | M | 22 | 123.71 | 13.25 | 2.37 | 15.62 | 18 | 440.00 | FALSE | 49.887427 | 2993.2456 | 3354.9793 |
+| CU_B1_P204_SW | 2023 | CU | CU_2023 | LWC | 2 | 204 | SW | 18 | 92.96 | 21.66 | 20.350000000000001 | 42.01 | 21 | 394.00 | FALSE | 44.671923 | 2680.3154 | 3004.2315 |
+| CU_B1_P301 | 2023 | CU | CU_2023 | NWC | 3 | 301 | M | 25 | 189.87 | 2.35 | 2.56 | 4.91 | 21 | 364.00 | FALSE | 41.270507 | 2476.2304 | 2775.4829 |
+| CU_B1_P301_SW | 2023 | CU | CU_2023 | NWC | 3 | 301 | SW | 25 | 72.63 | 19.84 | 35.159999999999997 | 55.00 | 20 | 280.00 | FALSE | 31.746544 | 1904.7927 | 2134.9868 |
+| CU_B1_P302 | 2023 | CU | CU_2023 | EWC | 3 | 302 | M | 22 | 106.52 | 9.2799999999999994 | 22.69 | 31.97 | 20 | 303.00 | FALSE | 34.354296 | 2061.2578 | 2310.3608 |
+| CU_B1_P302_SW | 2023 | CU | CU_2023 | EWC | 3 | 302 | SW | 28 | 108.71 | 20.41 | 35.78 | 56.19 | 16 | 288.00 | FALSE | 32.653588 | 1959.2153 | 2195.9865 |
+| CU_B1_P303 | 2023 | CU | CU_2023 | LWC | 3 | 303 | M | 19 | 123.60 | 0.7 | 3.05 | 3.75 | 23 | 445.00 | FALSE | 50.454329 | 3027.2597 | 3393.1041 |
+| CU_B1_P303_SW | 2023 | CU | CU_2023 | LWC | 3 | 303 | SW | 15 | 74.73 | 17.260000000000002 | 20.399999999999999 | 37.66 | 15 | 236.00 | FALSE | 26.757801 | 1605.4681 | 1799.4889 |
+| CU_B1_P304 | 2023 | CU | CU_2023 | AWC | 3 | 304 | M | 27 | 115.82 | 2.0499999999999998 | 7.62 | 9.67 | 20 | 418.00 | FALSE | 47.393055 | 2843.5833 | 3187.2304 |
+| CU_B1_P304_SW | 2023 | CU | CU_2023 | AWC | 3 | 304 | SW | 15 | 150.55 | 16.03 | 6.91 | 22.94 | 21 | 373.00 | FALSE | 42.290932 | 2537.4559 | 2844.1075 |
+| CU_B1_P401 | 2023 | CU | CU_2023 | LWC | 4 | 401 | M | 25 | 146.13 | 9.11 | 14.5 | 23.61 | 15 | 372.00 | FALSE | 42.177552 | 2530.6531 | 2836.4825 |
+| CU_B1_P401_SW | 2023 | CU | CU_2023 | LWC | 4 | 401 | SW | 23 | 86.23 | 5.84 | 4.32 | 10.16 | 19 | 299.00 | FALSE | 33.900774 | 2034.0464 | 2279.8610 |
+| CU_B1_P402 | 2023 | CU | CU_2023 | AWC | 4 | 402 | M | 21 | 79.72 | 10.57 | 40.96 | 51.53 | 20 | 333.00 | FALSE | 37.755711 | 2265.3427 | 2539.1094 |
+| CU_B1_P402_SW | 2023 | CU | CU_2023 | AWC | 4 | 402 | SW | 18 | 92.61 | 45.45 | 3.4 | 48.85 | 11 | 222.00 | FALSE | 25.170474 | 1510.2285 | 1692.7396 |
+| CU_B1_P403 | 2023 | CU | CU_2023 | NWC | 4 | 403 | M | 19 | 85.78 | 0.05 | 31.06 | 31.11 | 17 | 327.00 | FALSE | 37.075428 | 2224.5257 | 2493.3596 |
+| CU_B1_P403_SW | 2023 | CU | CU_2023 | NWC | 4 | 403 | SW | 19 | 61.73 | 11.63 | 38.799999999999997 | 50.43 | 23.5 | 253.00 | FALSE | 28.685270 | 1721.1162 | 1929.1131 |
+| CU_B1_P404 | 2023 | CU | CU_2023 | EWC | 4 | 404 | M | 22 | 100.60 | 0.65 | 4.96 | 5.61 | 26.5 | 317.00 | FALSE | 35.941623 | 2156.4974 | 2417.1101 |
+| CU_B1_P404_SW | 2023 | CU | CU_2023 | EWC | 4 | 404 | SW | 21 | 62.23 | 35.43 | 45.86 | 81.29 | 16 | 252.00 | FALSE | 28.571890 | 1714.3134 | 1921.4882 |
+| CU_B1_P101 | 2024 | CU | CU_2024 | EWC | 1 | 101 | M | 21 | 194.24 | 0 | 0.1 | 0.10 | 23 | 424.37 | FALSE | 48.115289 | 2886.9173 | 3235.8013 |
+| CU_B1_P101_SW | 2024 | CU | CU_2024 | EWC | 1 | 101 | SW | 22 | 187.31 | 4.25 | 25.47 | 29.72 | 22 | 347.64 | FALSE | 39.415602 | 2364.9361 | 2650.7387 |
+| CU_B1_P102 | 2024 | CU | CU_2024 | LWC | 1 | 102 | M | 23 | 260.63 | 0.31 | 3.43 | 3.74 | 21 | 449.12 | FALSE | 50.921457 | 3055.2874 | 3424.5189 |
+| CU_B1_P102_SW | 2024 | CU | CU_2024 | LWC | 1 | 102 | SW | 22 | 264.81 | 2.89 | 13.44 | 16.33 | 19 | 367.12 | FALSE | 41.624255 | 2497.4553 | 2799.2727 |
+| CU_B1_P103 | 2024 | CU | CU_2024 | AWC | 1 | 103 | M | 24 | 220.66 | 2.66 | 11.82 | 14.48 | 23 | 487.22 | FALSE | 55.241254 | 3314.4753 | 3715.0296 |
+| CU_B1_P103_SW | 2024 | CU | CU_2024 | AWC | 1 | 103 | SW | 31 | 196.63 | 0.23 | 27.51 | 27.74 | 21 | 369.09 | FALSE | 41.847614 | 2510.8569 | 2814.2939 |
+| CU_B1_P104 | 2024 | CU | CU_2024 | NWC | 1 | 104 | M | 21 | 262.91 | 0 | 4.88 | 4.88 | 24 | 426.38 | FALSE | 48.343184 | 2900.5910 | 3251.1275 |
+| CU_B1_P104_SW | 2024 | CU | CU_2024 | NWC | 1 | 104 | SW | 25 | 246.26 | 0.31 | 29.28 | 29.59 | 24 | 491.50 | FALSE | 55.726523 | 3343.5914 | 3747.6644 |
+| CU_B1_P201 | 2024 | CU | CU_2024 | AWC | 2 | 201 | M | 24 | 232.50 | 3.27 | 5.44 | 8.71 | 22 | 381.08 | FALSE | 43.207047 | 2592.4228 | 2905.7171 |
+| CU_B1_P201_SW | 2024 | CU | CU_2024 | AWC | 2 | 201 | SW | 18 | 338.57 | 0 | 6.73 | 6.73 | 17 | 338.95 | FALSE | 38.430326 | 2305.8195 | 2584.4778 |
+| CU_B1_P202 | 2024 | CU | CU_2024 | NWC | 2 | 202 | M | 23 | 191.35 | 0 | 0 | 0.00 | 21 | 464.46 | FALSE | 52.660714 | 3159.6428 | 3541.4857 |
+| CU_B1_P202_SW | 2024 | CU | CU_2024 | NWC | 2 | 202 | SW | 19 | 202.65 | 1.69 | 53.08 | 54.77 | 21 | 428.99 | FALSE | 48.639107 | 2918.3464 | 3271.0286 |
+| CU_B1_P203 | 2024 | CU | CU_2024 | EWC | 2 | 203 | M | 27 | 219.71 | 0 | 0.57999999999999996 | 0.58 | 25 | 426.92 | FALSE | 48.404409 | 2904.2646 | 3255.2449 |
+| CU_B1_P203_SW | 2024 | CU | CU_2024 | EWC | 2 | 203 | SW | 19 | 213.33 | 2.29 | 23.94 | 26.23 | 23 | 415.66 | FALSE | 47.127745 | 2827.6647 | 3169.3880 |
+| CU_B1_P204 | 2024 | CU | CU_2024 | LWC | 2 | 204 | M | 21 | 259.74 | 0.61 | 1.28 | 1.89 | 18 | 336.90 | FALSE | 38.197896 | 2291.8737 | 2568.8467 |
+| CU_B1_P204_SW | 2024 | CU | CU_2024 | LWC | 2 | 204 | SW | 19 | 211.28 | 2.68 | 29.02 | 31.70 | 21 | 308.24 | FALSE | 34.948410 | 2096.9046 | 2350.3155 |
+| CU_B1_P301 | 2024 | CU | CU_2024 | NWC | 3 | 301 | M | 20 | 335.38 | 0.05 | 8.24 | 8.29 | 25 | 404.96 | FALSE | 45.914573 | 2754.8744 | 3087.8010 |
+| CU_B1_P301_SW | 2024 | CU | CU_2024 | NWC | 3 | 301 | SW | 26 | 104.52 | 6.86 | 43.95 | 50.81 | 20 | 380.83 | FALSE | 43.178702 | 2590.7221 | 2903.8109 |
+| CU_B1_P302 | 2024 | CU | CU_2024 | EWC | 3 | 302 | M | 23 | 270.00 | 0 | 10.48 | 10.48 | 19 | 243.14 | FALSE | 27.567338 | 1654.0403 | 1853.9311 |
+| CU_B1_P302_SW | 2024 | CU | CU_2024 | EWC | 3 | 302 | SW | 19 | 142.35 | 6.13 | 53.1 | 59.23 | 16 | 280.79 | FALSE | 31.836115 | 1910.1669 | 2141.0106 |
+| CU_B1_P303 | 2024 | CU | CU_2024 | LWC | 3 | 303 | M | 20 | 161.83 | 7.83 | 8.23 | 16.06 | 16 | 278.50 | FALSE | 31.576473 | 1894.5884 | 2123.5494 |
+| CU_B1_P303_SW | 2024 | CU | CU_2024 | LWC | 3 | 303 | SW | 26 | 175.65 | 6.05 | 34.92 | 40.97 | 18 | 226.56 | FALSE | 25.687490 | 1541.2494 | 1727.5094 |
+| CU_B1_P304 | 2024 | CU | CU_2024 | AWC | 3 | 304 | M | 23 | 241.56 | 0.87 | 4.0999999999999996 | 4.97 | 25 | 285.08 | FALSE | 32.322517 | 1939.3510 | 2173.7216 |
+| CU_B1_P304_SW | 2024 | CU | CU_2024 | AWC | 3 | 304 | SW | 19 | 139.25 | 12.91 | 7.92 | 20.83 | 24 | 248.29 | FALSE | 28.151248 | 1689.0749 | 1893.1996 |
+| CU_B1_P401 | 2024 | CU | CU_2024 | LWC | 4 | 401 | M | 21 | 221.18 | 3.33 | 12.52 | 15.85 | 19 | 177.79 | FALSE | 20.157922 | 1209.4753 | 1355.6404 |
+| CU_B1_P401_SW | 2024 | CU | CU_2024 | LWC | 4 | 401 | SW | 24 | 119.84 | 4.67 | 55.67 | 60.34 | 15 | 137.37 | FALSE | 15.575081 | 934.5049 | 1047.4398 |
+| CU_B1_P402 | 2024 | CU | CU_2024 | AWC | 4 | 402 | M | 17 | 164.73 | 0.06 | 5.29 | 5.35 | 24 | 292.51 | FALSE | 33.164934 | 1989.8961 | 2230.3750 |
+| CU_B1_P402_SW | 2024 | CU | CU_2024 | AWC | 4 | 402 | SW | 22 | 207.86 | 0.05 | 6.98 | 7.03 | 28 | 295.52 | FALSE | 33.506210 | 2010.3726 | 2253.3261 |
+| CU_B1_P403 | 2024 | CU | CU_2024 | NWC | 4 | 403 | M | 20 | 245.96 | 0 | 1.91 | 1.91 | 23 | 227.20 | FALSE | 25.760053 | 1545.6032 | 1732.3893 |
+| CU_B1_P403_SW | 2024 | CU | CU_2024 | NWC | 4 | 403 | SW | 19 | 155.42 | 2.74 | 64.849999999999994 | 67.59 | 26 | 223.91 | FALSE | 25.387031 | 1523.2219 | 1707.3032 |
+| CU_B1_P404 | 2024 | CU | CU_2024 | EWC | 4 | 404 | M | 24 | 189.20 | 0 | 4.7699999999999996 | 4.77 | 23 | 313.45 | FALSE | 35.539122 | 2132.3473 | 2390.0415 |
+| CU_B1_P404_SW | 2024 | CU | CU_2024 | EWC | 4 | 404 | SW | 25 | 82.14 | 6.43 | 53.68 | 60.11 | 21 | 281.95 | FALSE | 31.967636 | 1918.0582 | 2149.8555 |
 
 # Model testing
 
@@ -165,7 +229,7 @@ Fischer. Fisher is bogus apparently.
 ``` r
 # This is better for providing generalizatins and reccomendations. 
 
-random <- lmer(bean_yield_adj_kg_ha ~ mowing*weeds + (1|year) + (1|block) + (1|block:mowing), data = bean_yield_clean)
+random <- lmer(   bean_yield_adj_bu_acre ~ mowing*weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
 
 
 #tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
@@ -186,7 +250,7 @@ simulateResiduals(random,plot = TRUE) # Residuals and normality look good
 
     ## Object of Class DHARMa with simulated residuals based on 250 simulations with refit = FALSE . See ?DHARMa::simulateResiduals for help. 
     ##  
-    ## Scaled residual values: 0.672 0.384 0.288 0.176 0.436 0.452 0.624 0.608 0.516 0.9 0.448 0.668 0.88 0.828 0.696 0.668 0.928 0.736 0.588 0.892 ...
+    ## Scaled residual values: 0.72 0.248 0.232 0.184 0.328 0.344 0.548 0.456 0.352 0.848 0.304 0.444 0.872 0.728 0.616 0.664 0.896 0.62 0.58 0.86 ...
 
 ``` r
 check_model(random)
@@ -209,9 +273,9 @@ check_model(random)
 
 |     | model term   | df1 |   df2 | F.ratio |   p.value |
 |:----|:-------------|----:|------:|--------:|----------:|
-| 1   | mowing       |   3 |  7.72 |   1.166 | 0.3828906 |
-| 3   | weeds        |   1 | 38.54 |  13.911 | 0.0006157 |
-| 2   | mowing:weeds |   3 | 37.20 |   0.261 | 0.8531380 |
+| 1   | mowing       |   3 | 42.23 |   0.073 | 0.9742231 |
+| 3   | weeds        |   1 | 57.24 |  29.290 | 0.0000013 |
+| 2   | mowing:weeds |   3 | 55.38 |   1.009 | 0.3958540 |
 
 #### Anova table
 
@@ -222,12 +286,12 @@ Anova(random, type = 3)
 
     ## Analysis of Deviance Table (Type III Wald chisquare tests)
     ## 
-    ## Response: bean_yield_adj_kg_ha
-    ##                Chisq Df Pr(>Chisq)    
-    ## (Intercept)  21.6267  1  3.312e-06 ***
-    ## mowing        2.3060  3    0.51138    
-    ## weeds         5.9713  1    0.01454 *  
-    ## mowing:weeds  0.7887  3    0.85216    
+    ## Response: bean_yield_adj_bu_acre
+    ##                 Chisq Df Pr(>Chisq)    
+    ## (Intercept)  106.4035  1  < 2.2e-16 ***
+    ## mowing         1.8836  3  0.5969034    
+    ## weeds         13.4020  1  0.0002514 ***
+    ## mowing:weeds   3.0299  3  0.3870430    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -245,11 +309,11 @@ cld_mowing_fisher <-cld(emmeans(random, ~  mowing , type = "response"), Letters 
 cld_mowing_fisher
 ```
 
-    ##  mowing emmean  SE   df lower.CL upper.CL .group
-    ##  LWC      2237 480 1.33    -1232     5707  a    
-    ##  EWC      2157 480 1.34    -1273     5587  a    
-    ##  AWC      2022 477 1.31    -1520     5564  a    
-    ##  NWC      1976 478 1.32    -1532     5483  a    
+    ##  mowing emmean   SE   df lower.CL upper.CL .group
+    ##  LWC      35.0 3.61 3.89     24.9     45.2  a    
+    ##  AWC      34.7 3.59 3.79     24.5     44.9  a    
+    ##  NWC      34.3 3.59 3.82     24.1     44.5  a    
+    ##  EWC      34.2 3.61 3.89     24.0     44.3  a    
     ## 
     ## Results are averaged over the levels of: weeds 
     ## Degrees-of-freedom method: kenward-roger 
@@ -273,9 +337,9 @@ cld_weeds_fisher <-cld(emmeans(random, ~  weeds , type = "response"), Letters = 
 cld_weeds_fisher
 ```
 
-    ##  weeds emmean  SE   df lower.CL upper.CL .group
-    ##  M       2299 472 1.25    -1489     6086  a    
-    ##  SW      1897 472 1.25    -1886     5681   b   
+    ##  weeds emmean   SE   df lower.CL upper.CL .group
+    ##  M       37.5 3.42 3.15     26.9     48.1  a    
+    ##  SW      31.6 3.43 3.16     21.0     42.2   b   
     ## 
     ## Results are averaged over the levels of: mowing 
     ## Degrees-of-freedom method: kenward-roger 
@@ -290,7 +354,7 @@ cld_weeds_fisher
 ``` r
 bean_yield_clean |> 
   left_join(cld_mowing_fisher) |> 
-  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_kg_ha, fill = mowing)) +
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_bu_acre, fill = mowing)) +
   stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
@@ -300,7 +364,7 @@ bean_yield_clean |>
 #geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
   labs(
     x = "",
-       y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
+       y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("Not signficant"))) +
   
@@ -332,21 +396,19 @@ ggsave("bean_yield_mowing_kgha.png", width = 10, height = 8, dpi = 300)
 bean_yield_clean |> 
   left_join(cld_mowing_fisher) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), 
-             y = bean_yield_adj_kg_ha, fill = factor(year))) +  # Fill by year
-  stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
-  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
+             y = bean_yield_adj_bu_acre, fill = mowing)) + 
+  stat_summary(geom = "bar", fun = "mean", width = 0.6) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
-    fill = "Year",  # Legend title
-    #subtitle = expression(italic("Not significant"))
+    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)"))
   ) +
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
-  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Use wren's bookshelf colors
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  
   theme_bw() +
   theme(
-    legend.position = "right",
+    legend.position = "none",
     strip.background = element_blank(),
     strip.text = element_text(face = "bold", size = 12),
     axis.title = element_text(size = 24),
@@ -367,17 +429,17 @@ ggsave("bean_yield_mowing_kgha_FH.png", width = 10, height = 8, dpi = 300)
 ``` r
 bean_yield_clean |> 
   left_join(cld_weeds_fisher) |> 
-  ggplot(aes(x = weeds, y = bean_yield_adj_kg_ha, fill = weeds)) +  # Fill added
+  ggplot(aes(x = weeds, y = bean_yield_adj_bu_acre, fill = weeds)) +  # Fill added
   stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), 
                size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", kg~ha^{-1}, " at 13% moisture)")),
+    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
     fill = "Weed Treatment"
   ) +
-  scale_x_discrete(labels = c("Ambient weeds", "Surrogate weeds")) +
+  scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Ensure correct function use
   theme_bw() +
