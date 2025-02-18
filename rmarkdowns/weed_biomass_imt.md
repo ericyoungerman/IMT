@@ -565,3 +565,43 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
 ``` r
 ggsave("weed_biomass_mowing_kgha_fh.png", width = 10, height = 8, dpi = 300)
 ```
+
+## Weed level on weed biomass (significant)
+
+``` r
+weed_biomass_clean_fh |> 
+  left_join(cld_weeds_fisher_fh) |> 
+  ggplot(aes(x = weeds, y = response, fill = weeds)) +  # Fill added
+  #stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
+  #stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), 
+               #size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 40)), size = 7) +
+  labs(
+    x = "",
+    y = expression("Weed biomass" ~ (kg~ha^{-1})),
+  subtitle = expression(italic("P < 0.005"))
+  ) +
+  scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Ensure correct function use
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 20),
+    axis.title = element_text(size = 24),
+    axis.text = element_text(size = 20),
+    plot.title = element_text(size = 24, face = "bold"),
+    plot.subtitle = element_text(size = 24, face = "italic")
+  )
+```
+
+![](weed_biomass_imt_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+``` r
+ggsave("weed_biomass_weeds_kgha_fh.png", width = 10, height = 8, dpi = 300)
+```
