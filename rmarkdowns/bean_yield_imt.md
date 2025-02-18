@@ -885,7 +885,7 @@ bean_yield_clean |>
 ![](bean_yield_imt_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
-ggsave("bean_yield_weeds_buac_eco.png", width = 25, height = 10, dpi = 300)
+ggsave("bean_yield_weeds_buac_eco.png", width = 10, height = 8, dpi = 300)
 ```
 
 ## FARMHUB REPORT
@@ -957,5 +957,5 @@ bean_yield_clean_fh |>
 ![](bean_yield_imt_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ``` r
-ggsave("bean_yield_weeds_bhac_fh.png", width = 25, height = 10, dpi = 300)
+ggsave("bean_yield_weeds_bhac_fh.png", width = 10, height = 8, dpi = 300)
 ```

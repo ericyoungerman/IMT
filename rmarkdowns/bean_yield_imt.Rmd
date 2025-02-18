@@ -281,7 +281,7 @@ bean_yield_clean |>
     plot.title = element_text(size = 24, face = "bold"),
     plot.subtitle = element_text(size = 24, face = "italic")
   )
-ggsave("bean_yield_weeds_buac_eco.png", width = 25, height = 10, dpi = 300)
+ggsave("bean_yield_weeds_buac_eco.png", width = 10, height = 8, dpi = 300)
 ```
 ## FARMHUB REPORT
 ### Mowing on yield
@@ -340,5 +340,5 @@ bean_yield_clean_fh |>
     plot.title = element_text(size = 24, face = "bold"),
     plot.subtitle = element_text(size = 24, face = "italic")
   )
-ggsave("bean_yield_weeds_bhac_fh.png", width = 25, height = 10, dpi = 300)
+ggsave("bean_yield_weeds_bhac_fh.png", width = 10, height = 8, dpi = 300)
 ```
