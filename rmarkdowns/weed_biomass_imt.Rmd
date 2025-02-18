@@ -1,5 +1,5 @@
 ---
-title: "Weed biomass"
+title: "IMT Weed biomass"
 output: github_document
 ---
 
@@ -39,6 +39,7 @@ library(ggResidpanel) ##install.packages("ggResidpanel")
 library(glmmTMB)  ##install.packages("glmmTMB")
 library(DHARMa)  ##install.packages("DHARMa")
 library(performance) ##install.packages("performance")
+library(WrensBookshelf)##install.packages("WrensBookshelf")
 #Load Functions
 MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
 
@@ -60,7 +61,7 @@ kable(head(combined_raw))
 ```
 
 ##Clean data
-
+##ECOBEAN
 ```{r}
 #Standardaze column names, convert to factors, check for outliers of variable**
 clean_combined <- clean_names(combined_raw) |>  
@@ -75,8 +76,26 @@ weed_biomass_clean <-clean_combined |>
   mutate(weed_biomass_lbs_ac = ((weed_biomass_grams_meter *(10000))/(1000))* 0.892179)
 kable(head(weed_biomass_clean)) 
 ```
-#GLMM
+##FARMHUB REPORT
+```{r}
+#Standardaze column names, convert to factors, check for outliers of variable**
+clean_combined <- clean_names(combined_raw) |>  
+  rename ('mowing'= treatment,'weeds'= microplot) |> 
+  mutate(across(c(year, location, site_year, mowing, block, plot, weeds, ), as.factor)) 
 
+#select and convert data for wbm analysis
+weed_biomass_clean_fh <-clean_combined |>             
+  filter(weeds %in% c("SW", "M")) |>  # Keep rows where SW and M are microplots
+   filter(location %in% c("FH", "CU")) |>
+  mutate(weed_biomass_grams_meter = (weed_biomass /0.5)) |> 
+  mutate(weed_biomass_kg_ha = (weed_biomass_grams_meter *(10000))/(1000)) |>
+  mutate(weed_biomass_lbs_ac = ((weed_biomass_grams_meter *(10000))/(1000))* 0.892179)
+kable(head(weed_biomass_clean_fh)) 
+```
+
+# Model testing
+##ECOBEAN
+### Glmm
 ```{r}
 
 model_tweedie_log <- glmmTMB(weed_biomass_kg_ha ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
@@ -99,22 +118,19 @@ VarCorr(model_tweedie_log )
 
 ```
 
-#### Joint test (anova)
+### Joint test (anova)
 ```{r}
 model_tweedie_log |> 
   joint_tests() |> 
   kable()  
 ```
-
+### Anova table
 ```{r}
 options(contrasts = c("contr.sum", "contr.poly"))
 Anova(model_tweedie_log, type = 3)
 ```
-
-<br>
-
-## Fisher compact letter display
-#### Mowing (Significant)
+### Fisher compact letter display
+#### Weed control (Significant)
 
 ```{r}
 cld_mowing_fisher <-cld(emmeans(model_tweedie_log, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
@@ -123,7 +139,7 @@ cld_mowing_fisher
 
 ```
 
-### Weeds (Significant)
+#### Weed level (Significant)
 
 ```{r}
 cld_weeds_fisher <-cld(emmeans(model_tweedie_log, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
@@ -131,9 +147,63 @@ cld_weeds_fisher
 
 
 ```
+##FARMHUB REPORT
+### Glmm
+```{r}
 
-# Figures
-## Mowing (Significant)
+model_tweedie_log_fh <- glmmTMB(weed_biomass_kg_ha ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
+  data = weed_biomass_clean_fh, 
+  family = tweedie(link = "log")
+
+)
+
+###It assumes that mowing effects may vary by block, in addition to site-year and block-level variation.
+#This would be useful if you suspect that mowing impacts weed biomass differently in different blocks.
+#The model accounts for hierarchical structure down to the mowing level within blocks.
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_tweedie_log_fh,plot = TRUE) # Residuals and normality look good
+check_model(model_tweedie_log_fh) #Perfect, preditions match real data
+
+summary(model_tweedie_log_fh )
+VarCorr(model_tweedie_log_fh )
+
+
+```
+
+### Joint test (anova)
+```{r}
+model_tweedie_log_fh |> 
+  joint_tests() |> 
+  kable()  
+```
+### Anova table
+```{r}
+options(contrasts = c("contr.sum", "contr.poly"))
+Anova(model_tweedie_log_fh, type = 3)
+```
+### Fisher compact letter display
+#### Weed control (Significant)
+
+```{r}
+cld_mowing_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_mowing_fisher_fh
+
+
+```
+#### Weed level (Significant)
+
+```{r}
+cld_weeds_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_weeds_fisher_fh
+
+
+```
+
+#Figures
+##ECOBEAN
+### Mowing (Significant)
+
 
 ```{r message=FALSE}
 weed_biomass_clean |> 
@@ -154,7 +224,7 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
   
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
-  scale_fill_viridis(discrete = TRUE, option = "D", direction = -1, end = 0.9, begin = 0.1) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +
    theme_bw() +
   theme(
     legend.position = "none",
@@ -165,5 +235,80 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   )
-ggsave("weed_biomass_mowing_kghec.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_mowing_kgha_eco.png", width = 10, height = 8, dpi = 300)
 ```
+
+### Weed level of weed biomass (significant)
+
+```{r message=FALSE}
+weed_biomass_clean |> 
+  left_join(cld_weeds_fisher) |> 
+  ggplot(aes(x = weeds, y = response, fill = weeds)) +  # Fill added
+  #stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
+  #stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), 
+               #size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 40)), size = 7) +
+  labs(
+    x = "",
+    y = expression("Weed biomass" ~ (kg~ha^{-1})),
+  subtitle = expression(italic("P < 0.005"))
+  ) +
+  scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Ensure correct function use
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 20),
+    axis.title = element_text(size = 24),
+    axis.text = element_text(size = 20),
+    plot.title = element_text(size = 24, face = "bold"),
+    plot.subtitle = element_text(size = 24, face = "italic")
+  )
+ggsave("weed_biomass_weeds_kgha_eco.png", width = 10, height = 8, dpi = 300)
+```
+
+#Figures
+##FARMHUB REPORT
+### Mowing (Significant)
+
+
+```{r message=FALSE}
+weed_biomass_clean_fh |> 
+  left_join(cld_mowing_fisher_fh) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
+  #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
+  labs(
+    x = "",
+     y = expression("Weed biomass" ~ (kg~ha^{-1})),
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    subtitle = expression(italic("P < 0.005"))) +
+  
+  scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 24),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  )
+ggsave("weed_biomass_mowing_kgha_fh.png", width = 10, height = 8, dpi = 300)
+```
+
+
