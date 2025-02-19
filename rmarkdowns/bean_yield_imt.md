@@ -575,7 +575,7 @@ TUKEY rather the Fischer. Fisher is bogus apparently.
 ``` r
 # This is better for providing generalizatins and reccomendations. 
 
-random <- lmer(bean_yield_adj_bu_acre ~ mowing*weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
+random <- lmer(bean_yield_adj_bu_acre ~ mowing+weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
 
 
 #tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
@@ -596,7 +596,7 @@ simulateResiduals(random,plot = TRUE) # Residuals and normality look good
 
     ## Object of Class DHARMa with simulated residuals based on 250 simulations with refit = FALSE . See ?DHARMa::simulateResiduals for help. 
     ##  
-    ## Scaled residual values: 0.28 0.088 0.42 0.156 0.38 0.164 0.176 0.088 0.6 0.1 0.14 0.052 0.18 0.048 0.104 0.096 0.008 0.036 0.404 0.056 ...
+    ## Scaled residual values: 0.276 0.088 0.472 0.14 0.368 0.172 0.16 0.096 0.6 0.1 0.128 0.056 0.168 0.048 0.136 0.076 0.008 0.036 0.428 0.036 ...
 
 ``` r
 check_model(random)
@@ -612,11 +612,10 @@ check_model(random)
   kable()  
 ```
 
-|     | model term   | df1 |    df2 | F.ratio |   p.value |
-|:----|:-------------|----:|-------:|--------:|----------:|
-| 1   | mowing       |   3 | 114.00 |   1.960 | 0.1240196 |
-| 3   | weeds        |   1 | 153.61 | 156.270 | 0.0000000 |
-| 2   | mowing:weeds |   3 | 151.63 |   0.815 | 0.4871996 |
+| model term | df1 |    df2 | F.ratio |   p.value |
+|:-----------|----:|-------:|--------:|----------:|
+| mowing     |   3 | 114.03 |   1.949 | 0.1256974 |
+| weeds      |   1 | 156.56 | 157.078 | 0.0000000 |
 
 ### Anova table
 
@@ -628,11 +627,10 @@ Anova(random, type = 3)
     ## Analysis of Deviance Table (Type III Wald chisquare tests)
     ## 
     ## Response: bean_yield_adj_bu_acre
-    ##                 Chisq Df Pr(>Chisq)    
-    ## (Intercept)  150.1625  1  < 2.2e-16 ***
-    ## mowing         1.0664  3     0.7852    
-    ## weeds         34.5599  1  4.133e-09 ***
-    ## mowing:weeds   2.4468  3     0.4850    
+    ##              Chisq Df Pr(>Chisq)    
+    ## (Intercept) 165.76  1     <2e-16 ***
+    ## mowing        5.85  3     0.1191    
+    ## weeds       157.12  1     <2e-16 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -642,11 +640,6 @@ Anova(random, type = 3)
 
 ``` r
 cld_mowing_fisher <-cld(emmeans(random, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-```
-
-    ## NOTE: Results may be misleading due to involvement in interactions
-
-``` r
 cld_mowing_fisher
 ```
 
@@ -668,16 +661,11 @@ cld_mowing_fisher
 
 ``` r
 cld_weeds_fisher <-cld(emmeans(random, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-```
-
-    ## NOTE: Results may be misleading due to involvement in interactions
-
-``` r
 cld_weeds_fisher
 ```
 
     ##  weeds emmean   SE   df lower.CL upper.CL .group
-    ##  M       40.0 2.92 9.57     33.5     46.5  a    
+    ##  M       40.0 2.92 9.57     33.4     46.5  a    
     ##  SW      27.3 2.92 9.57     20.7     33.8   b   
     ## 
     ## Results are averaged over the levels of: mowing 
@@ -768,14 +756,14 @@ cld_mowing_fisher_fh <-cld(emmeans(random_fh, ~  mowing , type = "response"), Le
     ## NOTE: Results may be misleading due to involvement in interactions
 
 ``` r
-cld_mowing_fisher
+cld_mowing_fisher_fh
 ```
 
     ##  mowing emmean   SE   df lower.CL upper.CL .group
-    ##  EWC      35.1 3.04 11.3     28.4     41.8  a    
-    ##  NWC      34.6 3.04 11.2     27.9     41.3  ab   
-    ##  AWC      33.2 3.03 11.2     26.6     39.9  ab   
-    ##  LWC      31.5 3.04 11.2     24.9     38.2   b   
+    ##  LWC      35.0 3.61 3.89     24.9     45.2  a    
+    ##  AWC      34.7 3.59 3.79     24.5     44.9  a    
+    ##  NWC      34.3 3.59 3.82     24.1     44.5  a    
+    ##  EWC      34.2 3.61 3.89     24.0     44.3  a    
     ## 
     ## Results are averaged over the levels of: weeds 
     ## Degrees-of-freedom method: kenward-roger 
@@ -794,12 +782,12 @@ cld_weeds_fisher_fh <-cld(emmeans(random_fh, ~  weeds , type = "response"), Lett
     ## NOTE: Results may be misleading due to involvement in interactions
 
 ``` r
-cld_weeds_fisher
+cld_weeds_fisher_fh
 ```
 
     ##  weeds emmean   SE   df lower.CL upper.CL .group
-    ##  M       40.0 2.92 9.57     33.5     46.5  a    
-    ##  SW      27.3 2.92 9.57     20.7     33.8   b   
+    ##  M       37.5 3.42 3.15     26.9     48.1  a    
+    ##  SW      31.6 3.43 3.16     21.0     42.2   b   
     ## 
     ## Results are averaged over the levels of: mowing 
     ## Degrees-of-freedom method: kenward-roger 
@@ -901,7 +889,7 @@ bean_yield_clean_fh |>
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
+    y = expression(paste("Dry bean yield (", "bu/a", " at 13% moisture)")),
     subtitle = expression(italic("Not signficant"))) +
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
@@ -921,7 +909,7 @@ bean_yield_clean_fh |>
 ![](bean_yield_imt_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 ``` r
-ggsave("bean_yield_mowing_kgha_fh.png", width = 10, height = 8, dpi = 300)
+ggsave("bean_yield_mowing_bua_fh.png", width = 10, height = 8, dpi = 300)
 ```
 
 ### Weed level of yield (significant)
@@ -936,7 +924,7 @@ bean_yield_clean_fh |>
                size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
+   y = expression(paste("Dry bean yield (", "bu/a", " at 13% moisture)")),
   subtitle = expression(italic("P < 0.005"))
   ) +
   scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +

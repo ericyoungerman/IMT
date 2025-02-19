@@ -65,7 +65,7 @@ clean_combined <- clean_names(combined_weed_seeds) |>
   mutate(across(c(year, location, site_year, mowing, block, plot ), as.factor)) 
 #select and convert data for wbm analysis
 weed_seeds_clean <-clean_combined |>             
-  mutate(seed_number_meter = (seed_number *(1/0.0078))) 
+  mutate(seed_number_meter = round(seed_number *(1/0.0078))) 
   
 kable(head(weed_seeds_clean)) 
 ```
@@ -79,102 +79,298 @@ clean_combined_fh <- clean_names(combined_weed_seeds) |>
   mutate(across(c(year, location, site_year, mowing, block, plot ), as.factor)) 
 #select and convert data for wbm analysis
 weed_seeds_clean_fh <-clean_combined_fh |>             
-  mutate(seed_number_meter = (seed_number *(1/0.0078))) 
+  mutate(seed_number_meter = round(seed_number *(1/0.0078))) 
   
 kable(head(weed_seeds_clean_fh)) 
 ```
 
+
+
+
 # Model testing
+
 ##ECOBEAN
-### Glmm
+### Glmm Poisson
 ```{r}
 
-model_tweedie_log <- glmmTMB(seed_number_meter ~ mowing + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
-  data = weed_seeds_clean, 
-  family = tweedie(link = "log")
-
-)
+model_poisson <- glmmTMB(seed_number_meter ~ mowing  + (1|site_year:block),  
+                         data = weed_seeds_clean, 
+                         family = poisson(link = "log"))
 
 ###It assumes that mowing effects may vary by block, in addition to site-year and block-level variation.
 #This would be useful if you suspect that mowing impacts weed biomass differently in different blocks.
 #The model accounts for hierarchical structure down to the mowing level within blocks.
 
 ### Two checks specifically for a generalize linear approach
-simulateResiduals(model_tweedie_log,plot = TRUE) # Residuals and normality look good
-check_model(model_tweedie_log) #Perfect, preditions match real data
+simulateResiduals(model_poisson ,plot = TRUE) 
+testDispersion(model_poisson )
+check_model(model_poisson ) #Perfect, preditions match real data
 
-summary(model_tweedie_log )
-VarCorr(model_tweedie_log )
+summary(model_poisson )
+VarCorr(model_poisson )
+outlier_test <- testOutliers(model_poisson, type = "bootstrap")
 
 
 ```
-
-### Joint test (anova)
+###Glmm negative binomial
 ```{r}
-model_tweedie_log |> 
+model_nbinom <- glmmTMB(seed_number_meter ~ mowing + (1|site_year:block),  
+                        data = weed_seeds_clean, 
+                        family = nbinom2(link = "log"))
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_nbinom ,plot = TRUE) 
+testDispersion(model_nbinom )
+check_model(model_nbinom ) #Perfect, preditions match real data
+
+summary(model_nbinom )
+VarCorr(model_nbinom )
+outlier_test <- testOutliers(model_nbinom, type = "bootstrap")
+```
+###Glmm Zero-inflated Poisson (mowing)
+```{r}
+model_zip <- glmmTMB(seed_number_meter ~ mowing + (1|site_year:block),  
+                     data = weed_seeds_clean, 
+                     family = poisson(link = "log"), 
+                     zi = ~ mowing)  # Zero inflation part modeled by 'mowing'
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_zip ,plot = TRUE) 
+testDispersion(model_zip )
+check_model(model_zip) #Perfect, preditions match real data
+
+summary(model_zip)
+VarCorr(model_zip )
+outlier_test <- testOutliers(model_zip, type = "bootstrap")
+```
+
+###Glmm Zero-inflated Poisson location
+```{r}
+model_zip_location <- glmmTMB(seed_number_meter ~ mowing + (1|site_year:block),  data = weed_seeds_clean, 
+                               family = poisson(link = "log"), 
+                               zi = ~ location)
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_zip_location ,plot = TRUE) 
+testDispersion(model_zip_location )
+check_model(model_zip_location) #Perfect, preditions match real data
+
+summary(model_zip_location)
+VarCorr(model_zip_location )
+outlier_test <- testOutliers(model_zip_location, type = "bootstrap")
+```
+
+###Glmm zero-inflated negative bionomial (mowing)
+
+```{r}
+# Run a Zero-Inflated Negative Binomial model
+model_zinb<- glmmTMB(seed_number_meter ~ mowing+ (1|site_year:block),  
+                       data = weed_seeds_clean, 
+                       family = nbinom2(link = "log"), 
+                       zi = ~ mowing)
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_zinb ,plot = TRUE) 
+testDispersion(model_zinb )
+check_model(model_zinb) #Perfect, preditions match real data
+
+summary(model_zinb)
+
+outlier_test <- testOutliers(model_zinb, type = "bootstrap")
+```
+
+
+#### Joint test (anova)
+```{r}
+model_zinb |> 
   joint_tests() |> 
   kable()  
 ```
 
-### Anova table
+#### Anova table
 ```{r}
 options(contrasts = c("contr.sum", "contr.poly"))
-Anova(model_tweedie_log, type = 3)
+Anova(model_zinb, type = 3)
 ```
 
-### Fisher compact letter display
-#### Weed control (Significant)
+#### Fisher compact letter display
+##### Weed control (Significant)
 
 ```{r}
-cld_mowing_fisher <-cld(emmeans(model_tweedie_log, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_mowing_fisher <-cld(emmeans(model_zinb, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
 cld_mowing_fisher
 
 
 ```
 
 ##FARMHUB REPORT
-### Glmm
+### Glmm Poisson
 ```{r}
 
-model_tweedie_log_fh <- glmmTMB(seed_number_meter ~ mowing + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
-  data = weed_seeds_clean_fh, 
-  family = tweedie(link = "log")
-
-)
+model_poisson_fh <- glmmTMB(seed_number_meter ~ mowing  + (1|site_year:block),  
+                         data = weed_seeds_clean_fh, 
+                         family = poisson(link = "log"))
 
 ###It assumes that mowing effects may vary by block, in addition to site-year and block-level variation.
 #This would be useful if you suspect that mowing impacts weed biomass differently in different blocks.
 #The model accounts for hierarchical structure down to the mowing level within blocks.
 
 ### Two checks specifically for a generalize linear approach
-simulateResiduals(model_tweedie_log_fh,plot = TRUE) # Residuals and normality look good
-check_model(model_tweedie_log_fh) #Perfect, preditions match real data
+simulateResiduals(model_poisson_fh,plot = TRUE) 
+testDispersion(model_poisson_fh )
+check_model(model_poisson_fh ) #Perfect, preditions match real data
 
-summary(model_tweedie_log_fh )
-VarCorr(model_tweedie_log_fh )
+summary(model_poisson_fh )
+VarCorr(model_poisson_fh )
+outlier_test <- testOutliers(model_poisson_fh, type = "bootstrap")
 
 
 ```
-
-### Joint test (anova)
+###Glmm negative binomial
 ```{r}
-model_tweedie_log_fh |> 
+model_nbinom_fh<- glmmTMB(seed_number_meter ~ mowing + (1|site_year:block),  
+                        data = weed_seeds_clean_fh, 
+                        family = nbinom2(link = "log"))
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_nbinom_fh ,plot = TRUE) 
+testDispersion(model_nbinom_fh)
+check_model(model_nbinom_fh ) #Perfect, preditions match real data
+
+summary(model_nbinom_fh )
+VarCorr(model_nbinom_fh )
+outlier_test <- testOutliers(model_nbinom_fh, type = "bootstrap")
+```
+###Glmm Zero-inflated Poisson (mowing)
+```{r}
+model_zip_fh <- glmmTMB(seed_number_meter ~ mowing + (1|site_year:block),  
+                     data = weed_seeds_clean_fh, 
+                     family = poisson(link = "log"), 
+                     zi = ~ mowing)  # Zero inflation part modeled by 'mowing'
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_zip_fh ,plot = TRUE) 
+testDispersion(model_zip_fh )
+check_model(model_zip_fh) #Perfect, preditions match real data
+
+summary(model_zip_fh)
+VarCorr(model_zip_fh)
+outlier_test <- testOutliers(model_zip_fh, type = "bootstrap")
+```
+###Glmm zero-inflated negative bionomial (mowing)
+
+```{r}
+# Run a Zero-Inflated Negative Binomial model
+model_zinb_fh<- glmmTMB(seed_number_meter ~ mowing+ (1|site_year:block),  
+                       data = weed_seeds_clean_fh, 
+                       family = nbinom2(link = "log"), 
+                       zi = ~ mowing)
+
+### Two checks specifically for a generalize linear approach
+simulateResiduals(model_zinb_fh ,plot = TRUE) 
+testDispersion(model_zinb_fh )
+check_model(model_zinb_fh) #Perfect, preditions match real data
+
+summary(model_zinb_fh)
+
+outlier_test <- testOutliers(model_zinb_fh, type = "bootstrap")
+```
+
+#### Joint test (anova)
+```{r}
+model_zinb_fh |> 
   joint_tests() |> 
   kable()  
 ```
 
-### Anova table
+#### Anova table
 ```{r}
 options(contrasts = c("contr.sum", "contr.poly"))
-Anova(model_tweedie_log_fh, type = 3)
+Anova(model_zinb_fh, type = 3)
 ```
 
-### Fisher compact letter display
-#### Weed control (Significant)
+#### Fisher compact letter display
+##### Weed control (Significant)
 
 ```{r}
-cld_mowing_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_mowing_fisher_fh <-cld(emmeans(model_zinb_fh, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
 cld_mowing_fisher_fh
 
 
+```
+
+#Figures
+##ECOBEAN
+### Mowing (Significant)
+
+
+```{r message=FALSE}
+weed_seeds_clean |> 
+  left_join(cld_mowing_fisher) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
+  #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 44)), size = 7) +
+  labs(
+    x = "",
+      y = expression("Seed density" ~ (seeds~m^{-2})),
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    subtitle = expression(italic("P < 0.005"))) +
+  
+  scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 24),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  )
+ggsave("weed_seeds_mowing_meter_eco.png", width = 10, height = 8, dpi = 300)
+```
+
+
+##FARMHUB REPORT
+### Mowing (Significant)
+
+
+```{r message=FALSE}
+weed_seeds_clean_fh |> 
+  left_join(cld_mowing_fisher_fh) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
+  #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 26)), size = 7) +
+  labs(
+    x = "",
+     y = expression("Seed density" ~ (seeds~m^{-2})),
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    subtitle = expression(italic("P < 0.05"))) +
+  
+  scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 24),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  )
+ggsave("weed_seeds_mowing_meter_fh.png", width = 10, height = 8, dpi = 300)
 ```

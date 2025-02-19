@@ -126,7 +126,7 @@ Tyler is under the impression that block should always be random and that post-h
 
 # This is better for providing generalizatins and reccomendations. 
 
-random <- lmer(bean_yield_adj_bu_acre ~ mowing*weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
+random <- lmer(bean_yield_adj_bu_acre ~ mowing+weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
 
 
 #tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
@@ -205,14 +205,14 @@ Anova(random_fh, type = 3)
 
 ```{r}
 cld_mowing_fisher_fh <-cld(emmeans(random_fh, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-cld_mowing_fisher
+cld_mowing_fisher_fh
 ```
 
 #### Weeds (significant)
 
 ```{r}
 cld_weeds_fisher_fh <-cld(emmeans(random_fh, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-cld_weeds_fisher
+cld_weeds_fisher_fh
 ```
 
 #Figures
@@ -294,7 +294,7 @@ bean_yield_clean_fh |>
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
+    y = expression(paste("Dry bean yield (", "bu/a", " at 13% moisture)")),
     subtitle = expression(italic("Not signficant"))) +
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
@@ -310,7 +310,7 @@ bean_yield_clean_fh |>
     plot.subtitle = element_text(size = 24, face = "italic")
   )
 
-ggsave("bean_yield_mowing_kgha_fh.png", width = 10, height = 8, dpi = 300)
+ggsave("bean_yield_mowing_bua_fh.png", width = 10, height = 8, dpi = 300)
 ```
 ### Weed level of yield (significant)
 
@@ -324,7 +324,7 @@ bean_yield_clean_fh |>
                size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
+   y = expression(paste("Dry bean yield (", "bu/a", " at 13% moisture)")),
   subtitle = expression(italic("P < 0.005"))
   ) +
   scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
