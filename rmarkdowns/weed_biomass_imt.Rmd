@@ -98,7 +98,7 @@ kable(head(weed_biomass_clean_fh))
 ### Glmm
 ```{r}
 
-model_tweedie_log <- glmmTMB(weed_biomass_kg_ha ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
+model_tweedie_log <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
   data = weed_biomass_clean, 
   family = tweedie(link = "log")
 
@@ -151,12 +151,13 @@ cld_weeds_fisher
 ### Glmm
 ```{r}
 
-model_tweedie_log_fh <- glmmTMB(weed_biomass_kg_ha ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
+model_tweedie_log_fh <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
   data = weed_biomass_clean_fh, 
   family = tweedie(link = "log")
 
-)
 
+
+)
 ###It assumes that mowing effects may vary by block, in addition to site-year and block-level variation.
 #This would be useful if you suspect that mowing impacts weed biomass differently in different blocks.
 #The model accounts for hierarchical structure down to the mowing level within blocks.
@@ -218,7 +219,7 @@ weed_biomass_clean |>
 geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
   labs(
     x = "",
-     y = expression("Weed biomass" ~ (kg~ha^{-1})),
+     y = expression("Weed biomass (lbs/a)"),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("P < 0.005"))) +
   
@@ -235,7 +236,7 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   )
-ggsave("weed_biomass_mowing_kgha_eco.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_mowing_lbac_eco.png", width = 10, height = 8, dpi = 300)
 ```
 
 ### Weed level of weed biomass (significant)
@@ -291,7 +292,7 @@ weed_biomass_clean_fh |>
 geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
   labs(
     x = "",
-     y = expression("Weed biomass" ~ (kg~ha^{-1})),
+     y = expression("Weed biomass (lbs/a)"),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("P < 0.005"))) +
   
@@ -308,7 +309,7 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   )
-ggsave("weed_biomass_mowing_kgha_fh.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_mowing_lbac_fh.png", width = 10, height = 8, dpi = 300)
 ```
 
 ## Weed level on weed biomass (significant)
