@@ -60,7 +60,7 @@ kable(head(combined_raw))
 ```
 
 ##Clean data
-##ECOBEAN
+##ECOBEAN (includes data from all sites through 2024)
 ```{r}
 # Standardize column names and convert variables
 clean_combined <- combined_raw |>  
@@ -87,7 +87,7 @@ weed_biomass_clean <- clean_combined |>
 kable(head(weed_biomass_clean))
 
 ```
-##FARMHUB REPORT
+##FARMHUB 2024 REPORT (Musgrave and Farmhub only)
 ```{r}
 # Standardize column names and convert variables
 clean_combined <- combined_raw |>  
@@ -121,11 +121,14 @@ kable(head(weed_biomass_clean_fh))
 ```
 
 # Model testing
-##ECOBEAN
+##ECOBEAN (includes data from all sites through 2024)
 ### Glmm
 ```{r}
 
-model_tweedie_log <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds*location + (1|location:block)+ (1|location:block:mowing), 
+model_tweedie_log <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds  
+                    + (1|site_year) 
+                    + (1|site_year:block)
+                    + (1|site_year:block:mowing),  
   data = weed_biomass_clean, 
   family = tweedie(link = "log")
 
@@ -174,16 +177,9 @@ cld_weeds_fisher
 
 
 ```
-#### Location (Significant)
-
-```{r}
-cld_weeds_fisher <-cld(emmeans(model_tweedie_log, ~  location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weeds_fisher
 
 
-```
-
-##FARMHUB REPORT
+##FARMHUB 2024 REPORT (Musgrave and Farmhub only)
 ### Glmm
 ```{r}
 
@@ -220,37 +216,11 @@ options(contrasts = c("contr.sum", "contr.poly"))
 Anova(model_tweedie_log_fh, type = 3)
 ```
 ### Fisher compact letter display
-#### Weed control (Significant)
-
-```{r}
-cld_mowing_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_mowing_fisher_fh
-
-
-```
-#### Weed level (Significant)
-
-```{r}
-cld_weeds_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weeds_fisher_fh
-
-
-```
-#### location (Significant)
-
-```{r}
-cld_weeds_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_weeds_fisher_fh
-
-
-```
-weed level, location, mowing
+weeds|location|mowing (Significant)
 
 ```{r}
 cld_mowing_weeds_location_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing|weeds|location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
 cld_mowing_weeds_location_fisher_fh
-
-
 ```
 
 
@@ -269,10 +239,10 @@ weed_biomass_clean |>
   geom_bar(stat="identity", position=position_dodge()) + 
   geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
                  position=position_dodge(.9))+
-geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
+geom_text(aes(label = trimws(.group), y = response + (SE + 50)), size = 7) +
   labs(
     x = "",
-     y = expression("Weed biomass (lbs/a)"),
+     y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("P < 0.005"))) +
   
@@ -289,8 +259,16 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 35)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   )
-ggsave("weed_biomass_mowing_lbac_eco.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_mowing_kg_ha_eco.png", width = 10, height = 8, dpi = 300)
 ```
+```{r}
+
+
+emmeans_summary <- summary(emmeans(model_tweedie_log, ~ mowing, type = "response"))
+
+```
+
+`
 
 ### Weed level of weed biomass (significant)
 
@@ -305,7 +283,7 @@ weed_biomass_clean |>
   geom_bar(stat="identity", position=position_dodge()) + 
   geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
                  position=position_dodge(.9))+
-geom_text(aes(label = trimws(.group), y = response + (SE + 40)), size = 7) +
+geom_text(aes(label = trimws(.group), y = response + (SE + 65)), size = 7) +
   labs(
     x = "",
     y = expression("Weed biomass" ~ (kg~ha^{-1})),
@@ -324,15 +302,15 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 40)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),
     plot.subtitle = element_text(size = 24, face = "italic")
   )
-ggsave("weed_biomass_weeds_kgha_eco.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_weeds_kg_ha_eco.png", width = 10, height = 8, dpi = 300)
 ```
 
 #Figures
-##FARMHUB REPORT
+##FARMHUB REPORT (2024 Musgrave and Farmhub)
 ### Mowing (Significant)
 
 
-```{r message=FALSE}
+```{r eval=FALSE, message=FALSE, include=FALSE}
 weed_biomass_clean_fh |> 
   left_join(cld_mowing_fisher_fh) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
@@ -367,7 +345,7 @@ ggsave("weed_biomass_mowing_lbac_fh.png", width = 10, height = 8, dpi = 300)
 
 ## Weed level on weed biomass (significant)
 
-```{r message=FALSE}
+```{r eval=FALSE, include=FALSE}
 weed_biomass_clean_fh |> 
   left_join(cld_weeds_fisher_fh) |> 
   ggplot(aes(x = weeds, y = response, fill = weeds)) +  # Fill added
