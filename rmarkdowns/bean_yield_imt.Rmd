@@ -67,66 +67,120 @@ kable(head(combined_raw))
 
 
 ##Clean data
-###ECOBEAN
+###ECOBEAN (all sites)
 ```{r}
-#Standardaze column names, convert to factors, check for outliers of variable**
-clean_combined <- clean_names(combined_raw) |>  
+## Standardize column names and convert variables
+clean_combined <- combined_raw |>  
+  clean_names() |>  
   rename(mowing = treatment, weeds = microplot) |> 
-  mutate(across(c(year, location, site_year, mowing, block, plot, weeds), as.factor),
-         bean_yield = as.numeric(as.character(bean_yield))) |>  # Convert to numeric
-  mutate(is_outlier = bean_yield < (quantile(bean_yield, 0.25, na.rm = TRUE) - 1.5 * IQR(bean_yield, na.rm = TRUE)) |
-                     bean_yield > (quantile(bean_yield, 0.75, na.rm = TRUE) + 1.5 * IQR(bean_yield, na.rm = TRUE))) |> 
-  mutate(is_outlier = replace_na(is_outlier, FALSE))  # Ensure logical values
+  mutate(
+    across(c(year, location, site_year, mowing, block, plot, weeds), as.factor),
+    bean_yield = as.numeric(bean_yield)  # Convert to numeric safely
+  )
 
+# Define constants for yield conversion
+moisture_correction <- (100 - 0.00001) / (100 - 14)
+kg_to_lb <- 2.20462
+sqft_per_acre <- 43560
+sample_area_sqft <- 16.4
+grams_per_lb <- 454
+
+# Filter relevant data and compute adjusted yields
 bean_yield_clean <- clean_combined |>  
-  filter(weeds %in% c("SW", "M")) |> # Keep only SW and M microplots
-  filter(!is.na(bean_yield)) |>  # Remove NA values
-  filter(is_outlier == FALSE) |>  # Remove outliers
+  filter(
+    weeds %in% c("SW", "M"), 
+    !is.na(bean_yield)
+  ) |>  
   mutate(
-    bean_yield_adj_bu_acre = (((bean_yield / 454) / (16.4 / 43560)) / 60) * ((100 - 0.00001) / (100 - 14)),
-    bean_yield_adj_lbs_acre = ((bean_yield / 454) / (16.4 / 43560)) * ((100 - 0.00001) / (100 - 14)),
-    bean_yield_adj_kg_ha = ((bean_yield / 454) / (16.4 / 43560)) * 1.12085 * ((100 - 0.00001) / (100 - 14))
+    bean_yield_adj_bu_acre = (((bean_yield / grams_per_lb) / (sample_area_sqft / sqft_per_acre)) / 60) * moisture_correction,
+    bean_yield_adj_lbs_acre = ((bean_yield / grams_per_lb) / (sample_area_sqft / sqft_per_acre)) * moisture_correction,
+    bean_yield_adj_kg_ha = bean_yield_adj_lbs_acre / kg_to_lb
   )
-kable(bean_yield_clean)
+
+# Display cleaned dataset
+kable(head(bean_yield_clean))
 
 ```
 
-###FARMHUB REPORT 
+###FARMHUB 2024 REPORT (Musgrave and Farmhub)
 ```{r}
-#Standardaze column names, convert to factors, check for outliers of variable**
-clean_combined <- clean_names(combined_raw) |>  
+## Standardize column names, convert to factors, and check for outliers
+clean_combined <- combined_raw |>  
+  clean_names() |>  
   rename(mowing = treatment, weeds = microplot) |> 
-  mutate(across(c(year, location, site_year, mowing, block, plot, weeds), as.factor),
-         bean_yield = as.numeric(as.character(bean_yield))) |>  # Convert to numeric
-  mutate(is_outlier = bean_yield < (quantile(bean_yield, 0.25, na.rm = TRUE) - 1.5 * IQR(bean_yield, na.rm = TRUE)) |
-                     bean_yield > (quantile(bean_yield, 0.75, na.rm = TRUE) + 1.5 * IQR(bean_yield, na.rm = TRUE))) |> 
-  mutate(is_outlier = replace_na(is_outlier, FALSE))  # Ensure logical values
-
-bean_yield_clean_fh <- clean_combined |>  
-  filter(weeds %in% c("SW", "M")) |> # Keep only SW and M microplots
-  filter(location %in% c("FH", "CU")) |>
-  filter(!is.na(bean_yield)) |>  # Remove NA values
-  filter(is_outlier == FALSE) |>  # Remove outliers
   mutate(
-    bean_yield_adj_bu_acre = (((bean_yield / 454) / (16.4 / 43560)) / 60) * ((100 - 0.00001) / (100 - 14)),
-    bean_yield_adj_lbs_acre = ((bean_yield / 454) / (16.4 / 43560)) * ((100 - 0.00001) / (100 - 14)),
-    bean_yield_adj_kg_ha = ((bean_yield / 454) / (16.4 / 43560)) * 1.12085 * ((100 - 0.00001) / (100 - 14))
+    across(c(year, location, site_year, mowing, block, plot, weeds), as.factor),
+    bean_yield = as.numeric(bean_yield) # Convert to numeric safely
+  ) 
+
+# Define constants for yield conversion
+moisture_correction <- (100 - 0.00001) / (100 - 14)
+kg_to_lb <- 2.20462
+sqft_per_acre <- 43560
+sample_area_sqft <- 16.4
+grams_per_lb <- 454
+
+# Filter relevant data and compute adjusted yields
+bean_yield_clean_fh <- clean_combined |>  
+  filter(
+    weeds %in% c("SW", "M"), 
+    location %in% c("FH", "CU"), 
+    year == "2024", 
+    !is.na(bean_yield)
+  ) |>  
+  mutate(
+    bean_yield_adj_bu_acre_fh = (((bean_yield / grams_per_lb) / (sample_area_sqft / sqft_per_acre)) / 60) * moisture_correction,
+    bean_yield_adj_lbs_acre_fh = ((bean_yield / grams_per_lb) / (sample_area_sqft / sqft_per_acre)) * moisture_correction,
+    bean_yield_adj_kg_ha_fh = bean_yield_adj_lbs_acre_fh / kg_to_lb
   )
+
+# Display cleaned dataset
 kable(bean_yield_clean_fh)
-
 ```
+###FARMHUB REPORT (Musgrave and Farm hub, NWC only)
+```{r}
+# Standardize column names and convert variables
+clean_combined <- combined_raw |>  
+  clean_names() |>  
+  rename(mowing = treatment, weeds = microplot) |> 
+  mutate(
+    across(c(year, location, site_year, mowing, block, plot, weeds), as.factor),
+    bean_yield = as.numeric(bean_yield)  # Convert to numeric safely
+  )
 
+# Define constants for yield conversion
+moisture_correction <- (100 - 0.00001) / (100 - 14)
+kg_to_lb <- 2.20462
+sqft_per_acre <- 43560
+sample_area_sqft <- 16.4
+grams_per_lb <- 454
+
+# Filter relevant data and compute adjusted yields
+bean_yield_clean_fh_wf <- clean_combined |>  
+  filter(
+    location %in% c("FH", "CU"),
+    year == "2024",
+    mowing == "NWC",
+    !is.na(bean_yield)
+  ) |>  
+  mutate(
+    bean_yield_adj_bu_acre_fh_wf = (((bean_yield / grams_per_lb) / (sample_area_sqft / sqft_per_acre)) / 60) * moisture_correction,
+    bean_yield_adj_lbs_acre_fh_wf = ((bean_yield / grams_per_lb) / (sample_area_sqft / sqft_per_acre)) * moisture_correction,
+    bean_yield_adj_kg_ha_fh_wf = bean_yield_adj_lbs_acre_fh_wf / kg_to_lb
+  )
+
+# Display cleaned dataset
+kable(bean_yield_clean_fh_wf)
+```
 # Model testing
 ##ECOBEAN
 ### Lmer
-Block is random
-Tyler is under the impression that block should always be random and that post-hoc comparisons should use TUKEY rather the Fischer. Fisher is bogus apparently. 
 
 ```{r}
 
-# This is better for providing generalizatins and reccomendations. 
+# This is better for providing generalizations and recommendations. Location can be used as a random effect since we have 5 locations, (if need be, we can )
 
-random <- lmer(bean_yield_adj_bu_acre ~ mowing+weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean)
+random_eco <- lmer(bean_yield_adj_bu_acre ~ mowing*weeds  + (1|location) + (1|location:block)+  (1|location:block:mowing), data = bean_yield_clean)
 
 
 #tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
@@ -134,35 +188,35 @@ random <- lmer(bean_yield_adj_bu_acre ~ mowing+weeds + (1|site_year) + (1|site_y
 #random_uri <- lmer(bean_yield_adj_kg_ha  ~ mowing*weeds + location*year + (1|site_year:block)+  (1|site_year:block:mowing)  , data =  bean_yield_clean)
 
 
-resid_panel(random)
+resid_panel(random_eco)
 
-simulateResiduals(random,plot = TRUE) # Residuals and normality look good
-check_model(random)
+simulateResiduals(random_eco,plot = TRUE) # Residuals and normality look good
+check_model(random_eco)
 ```
 
 ### Joint test (anova)
 ```{r}
- random |> 
+ random_eco |> 
   joint_tests() |> 
   kable()  
 ```
 ### Anova table
 ```{r}
 options(contrasts = c("contr.sum", "contr.poly"))
-Anova(random, type = 3)
+Anova(random_eco, type = 3)
 ```
 ### Fisher compact letter display
 #### Weed-control (No significant)
 
 ```{r}
-cld_mowing_fisher <-cld(emmeans(random, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_mowing_fisher <-cld(emmeans(random_eco, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
 cld_mowing_fisher
 ```
 
 #### Weeds (significant)
 
 ```{r}
-cld_weeds_fisher <-cld(emmeans(random, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_weeds_fisher <-cld(emmeans(random_eco, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
 cld_weeds_fisher
 ```
 
@@ -175,7 +229,7 @@ Tyler is under the impression that block should always be random and that post-h
 
 # This is better for providing generalizatins and reccomendations. 
 
-random_fh <- lmer(bean_yield_adj_bu_acre ~ mowing*weeds + (1|site_year) + (1|site_year:block)+  (1|site_year:block:mowing), data = bean_yield_clean_fh)
+random_fh <- lmer(bean_yield_adj_bu_acre_fh ~ mowing*weeds*location+ (1|location:block)+  (1|location:block:mowing), data = bean_yield_clean_fh)
 
 
 #tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
@@ -214,7 +268,65 @@ cld_mowing_fisher_fh
 cld_weeds_fisher_fh <-cld(emmeans(random_fh, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
 cld_weeds_fisher_fh
 ```
+#### Weeds by location (significant)
 
+```{r}
+cld_weeds_location_fisher_fh <-cld(emmeans(random_fh, ~  weeds|location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_weeds_location_fisher_fh
+```
+#### Mowing by location (not significant)
+
+```{r}
+cld_mowing_location_fisher_fh <-cld(emmeans(random_fh, ~  mowing|location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_mowing_location_fisher_fh
+```
+##FARMHUB REPORT weed free
+### Lmer
+Block is random
+Tyler is under the impression that block should always be random and that post-hoc comparisons should use TUKEY rather the Fischer. Fisher is bogus apparently. 
+
+```{r}
+
+# This is better for providing generalizatins and reccomendations. 
+
+random_fh_wf <- lmer(bean_yield_adj_bu_acre_fh_wf ~ weeds*location+ (1|location:block)+  (1|location:block:mowing), data = bean_yield_clean_fh_wf)
+
+
+#tyler whats up with uri being random? location*year takes into accoutn if we are concerned about only these years and locations, everything is relative to the ten means from this experiment
+
+#random_uri <- lmer(bean_yield_adj_kg_ha  ~ mowing*weeds + location*year + (1|site_year:block)+  (1|site_year:block:mowing)  , data =  bean_yield_clean)
+
+
+resid_panel(random_fh_wf)
+
+simulateResiduals(random_fh_wf,plot = TRUE) # Residuals and normality look good
+check_model(random_fh_wf)
+```
+### Joint test (anova)
+```{r}
+ random_fh_wf |> 
+  joint_tests() |> 
+  kable()  
+```
+
+#### Weeds (Significant)
+
+```{r}
+cld_weeds_fisher_fh_wf <-cld(emmeans(random_fh_wf, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_weeds_fisher_fh_wf
+```
+#### Weeds by location (not significant)
+
+```{r}
+cld_weeds_location_fisher_fh_wf <-cld(emmeans(random_fh_wf, ~  weeds|location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_weeds_location_fisher_fh_wf
+```
+#### Weeds by location (not significant)
+
+```{r}
+cld_location_weeds_fisher_fh_wf <-cld(emmeans(random_fh_wf, ~  location|weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_location_weeds_fisher_fh_wf
+```
 #Figures
 ##ECOBEAN
 
@@ -222,8 +334,8 @@ cld_weeds_fisher_fh
 
 ```{r message=FALSE}
 bean_yield_clean |> 
-  left_join(cld_mowing_fisher) |> 
-  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_bu_acre, fill = mowing)) +
+  left_join(cld_mowing_fisher_fh) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_bu_acre_fh, fill = mowing)) +
   stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
@@ -233,9 +345,9 @@ bean_yield_clean |>
 #geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
   labs(
     x = "",
-       y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
+       y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 14% moisture)")))+
     #title = str_c("Influence of interrow weed control on weed biomass"),
-    subtitle = expression(italic("Not signficant"))) +
+    #subtitle = expression(italic("Not signficant"))) +
   
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
@@ -283,19 +395,20 @@ bean_yield_clean |>
   )
 ggsave("bean_yield_weeds_buac_eco.png", width = 10, height = 8, dpi = 300)
 ```
+
+
 ## FARMHUB REPORT
 ### Mowing on yield
 ```{r message=FALSE}
 bean_yield_clean_fh |> 
   left_join(cld_mowing_fisher_fh) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), 
-             y = bean_yield_adj_bu_acre, fill = mowing)) + 
+             y = bean_yield_adj_bu_acre_fh, fill = mowing)) + 
   stat_summary(geom = "bar", fun = "mean", width = 0.6) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", "bu/a", " at 13% moisture)")),
-    subtitle = expression(italic("Not signficant"))) +
+    y = expression(paste("Dry bean yield (", "bu/a", " at 14% moisture)"))) +
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  
@@ -312,22 +425,20 @@ bean_yield_clean_fh |>
 
 ggsave("bean_yield_mowing_bua_fh.png", width = 10, height = 8, dpi = 300)
 ```
-### Weed level of yield (significant)
+### Weed level on yield (significant)
 
 ```{r message=FALSE}
-bean_yield_clean_fh |> 
-  left_join(cld_weeds_fisher_fh) |> 
-  ggplot(aes(x = weeds, y = bean_yield_adj_bu_acre, fill = weeds)) +  # Fill added
+bean_yield_clean_fh_wf |> 
+  left_join(cld_weeds_fisher_fh_wf) |> 
+  ggplot(aes(x = factor(weeds, levels = c("WF", "M", "SW")), y = bean_yield_adj_bu_acre_fh_wf, fill = weeds)) +  # Fill added
   stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), 
                size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
   labs(
     x = "",
-   y = expression(paste("Dry bean yield (", "bu/a", " at 13% moisture)")),
-  subtitle = expression(italic("P < 0.005"))
-  ) +
-  scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
+   y = expression(paste("Dry bean yield (", "bu/a", " at 14% moisture)"))) +
+  scale_x_discrete(labels = c("Weed free", "Ambient weeds", "Surrogate + ambient weeds")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
   scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Ensure correct function use
   theme_bw() +
@@ -341,4 +452,35 @@ bean_yield_clean_fh |>
     plot.subtitle = element_text(size = 24, face = "italic")
   )
 ggsave("bean_yield_weeds_bhac_fh.png", width = 10, height = 8, dpi = 300)
+```
+
+### Weed level and location (not significant)
+
+```{r message=FALSE}
+bean_yield_clean_fh_wf |> 
+  left_join(cld_weeds_location_fisher_fh_wf) |> 
+  ggplot(aes(x = factor(weeds, levels = c("WF", "M", "SW")), y = bean_yield_adj_bu_acre_fh_wf, fill = weeds)) + facet_wrap(~location, ncol= 2, labeller = labeller(location = c("CU" = "Cornell Musgrave Research Farm", "FH" = "Hudson Valley Farm Hub"))) + # Fill added
+  stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
+  stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
+  stat_summary(geom = "text", fun = "MeanPlusSe", aes(label = trimws(.group)), 
+               size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
+  labs(
+    x = "",
+   y = expression(paste("Dry bean yield (", "bu/a", " at 14% moisture)")),
+  subtitle = expression(italic("P < 0.005"))
+  ) +
+  scale_x_discrete(labels = c("Weed free", "Ambient \nweeds", "Surrogate + \nambient weeds")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +  # Ensure correct function use
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 20),
+    axis.title = element_text(size = 24),
+    axis.text = element_text(size = 20),
+    plot.title = element_text(size = 24, face = "bold"),
+    plot.subtitle = element_text(size = 24, face = "italic")
+  )
+ggsave("bean_yield_weeds_location_bhac_fh.png", width = 10, height = 10, dpi = 300)
 ```

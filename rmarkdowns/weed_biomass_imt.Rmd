@@ -57,40 +57,67 @@ return(d)}
 ``` {r}
 combined_raw <- read_excel("~/Github/IMT/raw-data/combined_raw.xlsx")
 kable(head(combined_raw))
-
 ```
 
 ##Clean data
 ##ECOBEAN
 ```{r}
-#Standardaze column names, convert to factors, check for outliers of variable**
-clean_combined <- clean_names(combined_raw) |>  
-  rename ('mowing'= treatment,'weeds'= microplot) |> 
-  mutate(across(c(year, location, site_year, mowing, block, plot, weeds, ), as.factor)) 
+# Standardize column names and convert variables
+clean_combined <- combined_raw |>  
+  clean_names() |>  
+  rename(mowing = treatment, weeds = microplot) |> 
+  mutate(across(c(year, location, site_year, mowing, block, plot, weeds), as.factor))
 
-#select and convert data for wbm analysis
-weed_biomass_clean <-clean_combined |>             
+# Define constants for biomass conversion
+sq_m_to_ha <- 10000  # Square meters per hectare
+grams_to_kg <- 1000   # Grams per kilogram
+kg_to_lbs <- 2.20462  # Kilograms per pound
+half_meter_sq_m <- 0.5  # Sample area in square meters
+
+# Filter relevant data and compute adjusted weed biomass
+weed_biomass_clean <- clean_combined |>             
   filter(weeds %in% c("SW", "M")) |>  # Keep rows where SW and M are microplots
-  mutate(weed_biomass_grams_meter = (weed_biomass /0.5)) |> 
-  mutate(weed_biomass_kg_ha = (weed_biomass_grams_meter *(10000))/(1000)) |>
-  mutate(weed_biomass_lbs_ac = ((weed_biomass_grams_meter *(10000))/(1000))* 0.892179)
-kable(head(weed_biomass_clean)) 
+  mutate(
+    weed_biomass_grams_meter = weed_biomass / half_meter_sq_m,
+    weed_biomass_kg_ha = (weed_biomass_grams_meter * sq_m_to_ha) / grams_to_kg,
+    weed_biomass_lbs_ac = weed_biomass_kg_ha * kg_to_lbs
+  )
+
+# Display cleaned dataset
+kable(head(weed_biomass_clean))
+
 ```
 ##FARMHUB REPORT
 ```{r}
-#Standardaze column names, convert to factors, check for outliers of variable**
-clean_combined <- clean_names(combined_raw) |>  
-  rename ('mowing'= treatment,'weeds'= microplot) |> 
-  mutate(across(c(year, location, site_year, mowing, block, plot, weeds, ), as.factor)) 
+# Standardize column names and convert variables
+clean_combined <- combined_raw |>  
+  clean_names() |>  
+  rename(mowing = treatment, weeds = microplot) |> 
+  mutate(across(c(year, location, site_year, mowing, block, plot, weeds), as.factor))
 
-#select and convert data for wbm analysis
-weed_biomass_clean_fh <-clean_combined |>             
-  filter(weeds %in% c("SW", "M")) |>  # Keep rows where SW and M are microplots
-   filter(location %in% c("FH", "CU")) |>
-  mutate(weed_biomass_grams_meter = (weed_biomass /0.5)) |> 
-  mutate(weed_biomass_kg_ha = (weed_biomass_grams_meter *(10000))/(1000)) |>
-  mutate(weed_biomass_lbs_ac = ((weed_biomass_grams_meter *(10000))/(1000))* 0.892179)
-kable(head(weed_biomass_clean_fh)) 
+# Define constants for biomass conversion
+sq_m_to_ha <- 10000   # Square meters per hectare
+grams_to_kg <- 1000    # Grams per kilogram
+kg_to_lbs <- 2.20462   # Kilograms per pound
+half_meter_sq_m <- 0.5 # Sample area in square meters
+ha_to_acre <- 0.892179 # Hectares to acres conversion factor
+
+# Filter relevant data and compute adjusted weed biomass
+weed_biomass_clean_fh <- clean_combined |>             
+  filter(
+    weeds %in% c("SW", "M"),   # Keep rows where SW and M are microplots
+    location %in% c("FH", "CU"), # Keep only specific locations
+    year %in% c ("2024")
+  ) |>  
+  mutate(
+    weed_biomass_grams_meter_fh = weed_biomass / half_meter_sq_m,
+    weed_biomass_kg_ha_fh = (weed_biomass_grams_meter_fh * sq_m_to_ha) / grams_to_kg,
+    weed_biomass_lbs_ac_fh = weed_biomass_kg_ha_fh * ha_to_acre
+  )
+
+# Display cleaned dataset
+kable(head(weed_biomass_clean_fh))
+
 ```
 
 # Model testing
@@ -98,7 +125,7 @@ kable(head(weed_biomass_clean_fh))
 ### Glmm
 ```{r}
 
-model_tweedie_log <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
+model_tweedie_log <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds*location + (1|location:block)+ (1|location:block:mowing), 
   data = weed_biomass_clean, 
   family = tweedie(link = "log")
 
@@ -147,11 +174,20 @@ cld_weeds_fisher
 
 
 ```
+#### Location (Significant)
+
+```{r}
+cld_weeds_fisher <-cld(emmeans(model_tweedie_log, ~  location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_weeds_fisher
+
+
+```
+
 ##FARMHUB REPORT
 ### Glmm
 ```{r}
 
-model_tweedie_log_fh <- glmmTMB(weed_biomass_lbs_ac ~ mowing*weeds + (1|site_year) + (1|site_year:block)+ (1|site_year:block:mowing), 
+model_tweedie_log_fh <- glmmTMB(weed_biomass_lbs_ac_fh ~ mowing*weeds*location  + (1|location:block)+ (1|location:block:mowing), 
   data = weed_biomass_clean_fh, 
   family = tweedie(link = "log")
 
@@ -200,6 +236,23 @@ cld_weeds_fisher_fh
 
 
 ```
+#### location (Significant)
+
+```{r}
+cld_weeds_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_weeds_fisher_fh
+
+
+```
+weed level, location, mowing
+
+```{r}
+cld_mowing_weeds_location_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing|weeds|location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_mowing_weeds_location_fisher_fh
+
+
+```
+
 
 #Figures
 ##ECOBEAN
@@ -345,4 +398,45 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 40)), size = 7) +
     plot.subtitle = element_text(size = 24, face = "italic")
   )
 ggsave("weed_biomass_weeds_kgha_fh.png", width = 10, height = 8, dpi = 300)
+```
+
+### mowing|weeds|location (Significant)
+
+
+```{r message=FALSE}
+weed_biomass_clean_fh |> 
+  left_join(cld_mowing_weeds_location_fisher_fh) |> 
+  mutate(response = as.numeric(response)) |>  # Convert response to numeric
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
+   facet_grid(weeds ~ location, labeller = labeller(
+    location = c("CU" = "Cornell Musgrave Research Farm", "FH" = "Hudson Valley Farm Hub"),
+    weeds = c("M" = "Ambient Weeds", "SW" = "Surrogate +\ ambient weeds")
+  )) +
+  #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  #tat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 160)), size = 7) +
+  labs(
+    x = "",
+     y = expression("Weed biomass (lbs/a)")) +
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    
+  
+  scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 20),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 24),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  )
+ggsave("weed_biomass_mowing_weeds_location_lbac_fh.png", width = 13, height = 10, dpi = 300)
 ```
