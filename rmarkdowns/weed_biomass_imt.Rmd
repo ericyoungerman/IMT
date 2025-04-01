@@ -57,6 +57,7 @@ return(d)}
 ``` {r}
 combined_raw <- read_excel("~/Github/IMT/raw-data/combined_raw.xlsx")
 kable(head(combined_raw))
+
 ```
 
 ##Clean data
@@ -71,7 +72,7 @@ clean_combined <- combined_raw |>
 # Define constants for biomass conversion
 sq_m_to_ha <- 10000  # Square meters per hectare
 grams_to_kg <- 1000   # Grams per kilogram
-kg_to_lbs <- 2.20462  # Kilograms per pound
+kg_to_lbs_ac <- 0.893  # Kilograms per hectare to pounds per acre
 half_meter_sq_m <- 0.5  # Sample area in square meters
 
 # Filter relevant data and compute adjusted weed biomass
@@ -80,8 +81,8 @@ weed_biomass_clean <- clean_combined |>
   mutate(
     weed_biomass_grams_meter = weed_biomass / half_meter_sq_m,
     weed_biomass_kg_ha = (weed_biomass_grams_meter * sq_m_to_ha) / grams_to_kg,
-    weed_biomass_lbs_ac = weed_biomass_kg_ha * kg_to_lbs
-  )
+    weed_biomass_lbs_ac = weed_biomass_kg_ha * kg_to_lbs_ac)  # Updated conversion factor
+
 
 # Display cleaned dataset
 kable(head(weed_biomass_clean))
@@ -225,8 +226,8 @@ cld_mowing_weeds_location_fisher_fh
 
 
 #Figures
-##ECOBEAN
-### Mowing (Significant)
+##ECOBEAN 
+### Mowing (lbs/a) 
 
 
 ```{r message=FALSE}
@@ -242,9 +243,9 @@ weed_biomass_clean |>
 geom_text(aes(label = trimws(.group), y = response + (SE + 50)), size = 7) +
   labs(
     x = "",
-     y = expression("Weed biomass" ~ (kg ~ ha^{-1})),
+     y = expression("Weed biomass" ~ (lbs/a)),
     #title = str_c("Influence of interrow weed control on weed biomass"),
-    subtitle = expression(italic("P < 0.005"))) +
+    subtitle = expression(italic("P < 0.001"))) +
   
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
@@ -259,7 +260,7 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 50)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   )
-ggsave("weed_biomass_mowing_kg_ha_eco.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_biomass_mowing_lb_a_eco.png", width = 10, height = 8, dpi = 300)
 ```
 ```{r}
 
@@ -268,7 +269,41 @@ emmeans_summary <- summary(emmeans(model_tweedie_log, ~ mowing, type = "response
 
 ```
 
-`
+### Mowing (kg/ha)
+
+
+```{r message=FALSE}
+weed_biomass_clean |> 
+  left_join(cld_mowing_fisher) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
+  #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
+  #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
+  #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
+  geom_bar(stat="identity", position=position_dodge()) + 
+  geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
+                 position=position_dodge(.9))+
+geom_text(aes(label = trimws(.group), y = response + (SE + 50)), size = 7) +
+  labs(
+    x = "",
+     y = expression("Weed biomass" ~ (lbs/a)),
+    #title = str_c("Influence of interrow weed control on weed biomass"),
+    subtitle = expression(italic("P < 0.001"))) +
+  
+  scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
+  scale_fill_WB_d(name = "BlueberriesForSal", direction = 1) +
+   theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.title = element_text(size = 24),  # Increase font size of axis titles
+    axis.text = element_text(size = 24),   # Increase font size of axis labels
+    plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
+    plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
+  )
+ggsave("weed_biomass_mowing_lb_a_eco.png", width = 10, height = 8, dpi = 300)
+```
 
 ### Weed level of weed biomass (significant)
 

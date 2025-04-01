@@ -209,15 +209,27 @@ Anova(random_eco, type = 3)
 #### Weed-control (No significant)
 
 ```{r}
-cld_mowing_fisher <-cld(emmeans(random_eco, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-cld_mowing_fisher
+tukey_mowing <- emmeans(random_eco, list(pairwise ~ mowing), adjust = "tukey")
+tukey_mowing
+
+cld_mowing_tukey <- cld(emmeans(random_eco, ~ mowing), adjust = "tukey", Letters = letters, sort = TRUE, reversed = TRUE)
+
+cld_mowing_tukey
 ```
+
+
 
 #### Weeds (significant)
 
 ```{r}
-cld_weeds_fisher <-cld(emmeans(random_eco, ~  weeds , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-cld_weeds_fisher
+
+
+tukey_weeds <- emmeans(random_eco, list(pairwise ~ weeds), adjust = "tukey")
+tukey_weeds
+
+cld_weeds_tukey <- cld(emmeans(random_eco, ~ weeds), adjust = "tukey", Letters = letters, sort = TRUE, reversed = TRUE)
+
+cld_weeds_tukey
 ```
 
 ##FARMHUB REPORT
@@ -282,8 +294,6 @@ cld_mowing_location_fisher_fh
 ```
 ##FARMHUB REPORT weed free
 ### Lmer
-Block is random
-Tyler is under the impression that block should always be random and that post-hoc comparisons should use TUKEY rather the Fischer. Fisher is bogus apparently. 
 
 ```{r}
 
@@ -334,8 +344,8 @@ cld_location_weeds_fisher_fh_wf
 
 ```{r message=FALSE}
 bean_yield_clean |> 
-  left_join(cld_mowing_fisher_fh) |> 
-  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_bu_acre_fh, fill = mowing)) +
+  left_join(cld_mowing_tukey) |> 
+  ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = bean_yield_adj_bu_acre, fill = mowing)) +
   stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
   #stat_summary(geom="text", fun = "MeanPlusSe", aes(label= trimws(.group)),size=6.5,vjust=-0.5) +
@@ -345,9 +355,8 @@ bean_yield_clean |>
 #geom_text(aes(label = trimws(.group), y = response + (SE + 30)), size = 7) +
   labs(
     x = "",
-       y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 14% moisture)")))+
-    #title = str_c("Influence of interrow weed control on weed biomass"),
-    #subtitle = expression(italic("Not signficant"))) +
+       y = expression(paste("Dry bean yield (", bu/a, " at 14% moisture)")),
+    subtitle = expression(italic("Not significant"))) +
   
   scale_x_discrete(labels = c("No\nmowing", "Early\nmowing", "Late\nmowing", "As-needed\nmowing")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +
@@ -363,13 +372,13 @@ bean_yield_clean |>
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   
   )
-ggsave("bean_yield_mowing_kgha_eco.png", width = 10, height = 8, dpi = 300)
+ggsave("bean_yield_mowing_buac_eco.png", width = 10, height = 8, dpi = 300)
 ```
 ### Weed level of yield (significant)
 
 ```{r message=FALSE}
 bean_yield_clean |> 
-  left_join(cld_weeds_fisher) |> 
+  left_join(cld_weeds_tukey) |> 
   ggplot(aes(x = weeds, y = bean_yield_adj_bu_acre, fill = weeds)) +  # Fill added
   stat_summary(geom = "bar", fun = "mean", width = 0.6, position = position_dodge(width = 0.7)) +
   stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2, position = position_dodge(width = 0.7)) +
@@ -377,8 +386,8 @@ bean_yield_clean |>
                size = 6.5, vjust = -0.5, position = position_dodge(width = 0.7)) +
   labs(
     x = "",
-    y = expression(paste("Dry bean yield (", bu~a^{-1}, " at 13% moisture)")),
-  subtitle = expression(italic("P < 0.005"))
+    y = expression(paste("Dry bean yield (", bu/a, " at 14% moisture)")),
+  subtitle = expression(italic("P < 0.001"))
   ) +
   scale_x_discrete(labels = c("Ambient weeds", "Surrogate + ambient weeds")) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.3))) +

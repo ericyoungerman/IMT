@@ -64,8 +64,12 @@ clean_combined <- clean_names(combined_weed_seeds) |>
   rename ('mowing'= treatment) |> 
   mutate(across(c(year, location, site_year, mowing, block, plot ), as.factor)) 
 #select and convert data for wbm analysis
-weed_seeds_clean <-clean_combined |>             
-  mutate(seed_number_meter = round(seed_number *(1/0.0078))) 
+weed_seeds_clean <- clean_combined |>             
+  mutate(
+    seed_number_meter = round(seed_number * (1 / 0.0078)),
+    seed_number_foot = round(seed_number * (1 / 0.0078) / 10.7639) # 1 square meter = 10.7639 square feet
+  )
+
   
 kable(head(weed_seeds_clean)) 
 ```
@@ -164,7 +168,7 @@ outlier_test <- testOutliers(model_zip_location, type = "bootstrap")
 
 ```{r}
 # Run a Zero-Inflated Negative Binomial model
-model_zinb<- glmmTMB(seed_number_meter ~ mowing+ (1|site_year:block),  
+model_zinb<- glmmTMB(seed_number_foot ~ mowing + (1|location:block),  
                        data = weed_seeds_clean, 
                        family = nbinom2(link = "log"), 
                        zi = ~ mowing)
@@ -193,12 +197,48 @@ options(contrasts = c("contr.sum", "contr.poly"))
 Anova(model_zinb, type = 3)
 ```
 
-#### Fisher compact letter display
+#### Compact letter display
 ##### Weed control (Significant)
 
 ```{r}
-cld_mowing_fisher <-cld(emmeans(model_zinb, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
-cld_mowing_fisher
+
+tukey_mowing <- emmeans(model_zinb, list(pairwise ~ mowing), adjust = "tukey")
+tukey_mowing
+
+cld_mowing_tukey <- cld(emmeans(model_zinb, ~ mowing), adjust = "tukey", Letters = letters, sort = TRUE, reversed = TRUE)
+
+cld_mowing_tukey
+
+fisher_mowing <-cld(emmeans(model_zinb, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+fisher_mowing
+
+
+
+```
+##### Location (Significant)
+
+```{r}
+
+tukey_location <- emmeans(model_zinb, list(pairwise ~ location), adjust = "tukey")
+tukey_location
+
+cld_location_tukey <- cld(emmeans(model_zinb, ~ location), adjust = "tukey", Letters = letters, sort = TRUE, reversed = TRUE)
+
+cld_location_tukey
+
+
+```
+
+##### Location:location (Significant)
+
+```{r}
+
+tukey_mowing_location <- emmeans(model_zinb, list(pairwise ~ mowing|location), adjust = "tukey")
+tukey_mowing_location
+
+cld_mowing_location_tukey <- cld(emmeans(model_zinb, ~ mowing|location), adjust = "tukey", Letters = letters, sort = TRUE, reversed = TRUE)
+
+cld_mowing_location_tukey
 
 
 ```
@@ -306,7 +346,7 @@ cld_mowing_fisher_fh
 
 ```{r message=FALSE}
 weed_seeds_clean |> 
-  left_join(cld_mowing_fisher) |> 
+  left_join(fisher_mowing ) |> 
   ggplot(aes(x = factor(mowing, levels = c("NWC", "EWC", "LWC", "AWC")), y = response, fill = mowing)) +
   #stat_summary(geom = "bar", fun = "mean", width = 0.7) +
   #stat_summary(geom = "errorbar", fun.data = "mean_se", width = 0.2) +
@@ -314,10 +354,10 @@ weed_seeds_clean |>
   geom_bar(stat="identity", position=position_dodge()) + 
   geom_errorbar(aes(ymin=response-SE, ymax=response+SE), width=.2,
                  position=position_dodge(.9))+
-geom_text(aes(label = trimws(.group), y = response + (SE + 44)), size = 7) +
+geom_text(aes(label = trimws(.group), y = response + (SE + )), size = 7) +
   labs(
     x = "",
-      y = expression("Seed density" ~ (seeds~m^{-2})),
+      y = expression("Seed density" ~ (seeds/ft^{2})),
     #title = str_c("Influence of interrow weed control on weed biomass"),
     subtitle = expression(italic("P < 0.005"))) +
   
@@ -334,7 +374,7 @@ geom_text(aes(label = trimws(.group), y = response + (SE + 44)), size = 7) +
     plot.title = element_text(size = 24, face = "bold"),  # Increase font size of title
     plot.subtitle = element_text(size = 24, face = "italic")  # Increase font size of subtitle
   )
-ggsave("weed_seeds_mowing_meter_eco.png", width = 10, height = 8, dpi = 300)
+ggsave("weed_seeds_mowing_foot_eco.png", width = 10, height = 8, dpi = 300)
 ```
 
 
