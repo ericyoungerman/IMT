@@ -301,7 +301,7 @@ outlier_test <- testOutliers(model_zip_fh, type = "bootstrap")
 
 ```{r}
 # Run a Zero-Inflated Negative Binomial model
-model_zinb_fh<- glmmTMB(seed_number_meter ~ mowing+ (1|site_year:block),  
+model_zinb_fh<- glmmTMB(seed_number_meter ~ mowing + (1|site_year:block),  
                        data = weed_seeds_clean_fh, 
                        family = nbinom2(link = "log"), 
                        zi = ~ mowing)

@@ -283,14 +283,14 @@ cld_weeds_fisher_fh
 #### Weeds by location (significant)
 
 ```{r}
-cld_weeds_location_fisher_fh <-cld(emmeans(random_fh, ~  weeds|location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-cld_weeds_location_fisher_fh
+cld_location_fisher_fh <-cld(emmeans(random_fh, ~ location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_location_fisher_fh
 ```
 #### Mowing by location (not significant)
 
 ```{r}
-cld_mowing_location_fisher_fh <-cld(emmeans(random_fh, ~  mowing|location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
-cld_mowing_location_fisher_fh
+cld_mowing_weeds_location_fisher_fh <-cld(emmeans(random_fh, ~  mowing|weeds|location , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_mowing_weeds_location_fisher_fh
 ```
 ##FARMHUB REPORT weed free
 ### Lmer

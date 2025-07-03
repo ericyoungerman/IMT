@@ -1,0 +1,118 @@
+---
+title: "IMT bean population"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries
+
+```{r message=FALSE, warning=FALSE}
+
+#Set work directory
+setwd("/Users/ey239/Github/IMT/rmarkdowns")
+
+#Load packages 
+library(tidyverse) ##install.packages("tidyverse")
+library(knitr)
+library(patchwork) ##install.packages("patchwork")
+library(skimr)     ##install.packages("skimr")
+library(readxl)
+library(janitor) ##install.packages("janitor")
+
+library(kableExtra) ##install.packages("kableExtra")
+
+library(viridis) ##install.packages("viridis")
+library(lme4) ##install.packages("lme4")
+library(lmerTest) ##install.packages("lmerTest")
+library(emmeans) ##install.packages("emmeans")
+library(rstatix) ##install.packages("rstatix")
+#library(Matrix) ##install.packages("Matrix")
+library(multcomp) ##install.packages("multcomp")
+library(multcompView) ##install.packages("multcompView")
+library(ggResidpanel) ##install.packages("ggResidpanel")
+#library(car)
+#library(TMB)  ##install.packages("TMB")
+library(glmmTMB)  ##install.packages("glmmTMB")
+library(DHARMa)  ##install.packages("DHARMa")
+library(performance) ##install.packages("performance")
+library(WrensBookshelf)##install.packages("WrensBookshelf")
+#Load Functions
+MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+
+find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
+d=exp(c)
+return(d)}
+```
+
+<br>
+
+# Load and clean data
+
+## Load data
+
+``` {r}
+combined_raw <- read_excel("~/Github/IMT/raw-data/combined_raw.xlsx")
+kable(head(combined_raw))
+
+```
+
+##FARMHUB 2024 REPORT (Musgrave and Farmhub only)
+```{r}
+# Constants for conversion
+row_spacing_m <- 0.762                # 30-inch rows
+acre_m2 <- 4046.86                    # Square meters per acre
+row_m_per_acre <- acre_m2 / row_spacing_m  # ≈ 5311.5 meters of row per acre
+
+# Clean and convert bean population data
+bean_population_clean_fh <- combined_raw |>  
+  clean_names() |>  
+  rename(mowing = treatment, weeds = microplot) |> 
+  mutate(across(c(year, location, site_year, mowing, block, plot, weeds), as.factor)) |> 
+  filter(
+    weeds %in% c("SW", "M"),
+    location %in% c("FH", "CU")
+  ) |>  
+  mutate(
+    bean_population = as.numeric(bean_population),  # ensure numeric
+    bean_pop_plants_acre = bean_population * row_m_per_acre
+  )
+
+# Preview result
+kable(head(bean_population_clean_fh))
+
+```
+
+##FARMHUB 2024 REPORT (Musgrave and Farmhub only)
+### Glmm
+```{r}
+
+random_fh <- lmer(bean_pop_plants_acre ~ mowing*weeds*location+ (1|location:block)+  (1|location:block:mowing), data = bean_population_clean_fh)
+resid_panel(random_fh)
+
+simulateResiduals(random_fh,plot = TRUE) # Residuals and normality look good
+check_model(random_fh)
+
+
+
+
+
+
+```
+
+### Joint test (anova)
+```{r}
+ random_fh |> 
+  joint_tests() |> 
+  kable()  
+```
+
+### Fisher compact letter display
+#### Weed-control (No significant)
+
+```{r}
+cld_mowing_fisher_fh <-cld(emmeans(random_fh, ~  mowing , type = "response"), Letters = letters, adjust = "none",sort = TRUE, reversed=TRUE)
+cld_mowing_fisher_fh
+```

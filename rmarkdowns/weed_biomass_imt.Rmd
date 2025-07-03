@@ -223,7 +223,18 @@ weeds|location|mowing (Significant)
 cld_mowing_weeds_location_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing|weeds|location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
 cld_mowing_weeds_location_fisher_fh
 ```
-
+```{r}
+cld_mowing_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_mowing_fisher_fh
+```
+```{r}
+cld_location_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_location_fisher_fh
+```
+```{r}
+cld_weeds_fisher_fh <-cld(emmeans(model_tweedie_log_fh, ~  weeds, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_weeds_fisher_fh
+```
 
 #Figures
 ##ECOBEAN 
