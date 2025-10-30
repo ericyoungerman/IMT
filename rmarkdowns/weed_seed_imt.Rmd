@@ -243,6 +243,7 @@ ggplot(sum_tbl, aes(x = mowing, y = mean_week, fill = mowing)) +
         plot.title  = element_text(hjust = 0.5),
         plot.caption = element_text(hjust = 0, size = 10, color = "grey30"))
 
+
 ```
 
 ```{r}
@@ -326,6 +327,8 @@ knitr::kable(
   digits = 1,
   caption = "Model-based weekly means (seeds m^-2 week^-1) with CLD letters."
 )
+
+
 
 
 ```
@@ -459,6 +462,70 @@ ggplot() +
   theme_classic()
 
 ```
+
+```{r}
+# =======================================================
+# Model-based bar figure (styled like the raw-data figure)
+# assumes: emm_mb_plot already exists from the model step
+# =======================================================
+
+library(dplyr)
+library(ggplot2)
+
+# visual order to match your raw figure
+mow_labels <- c("No\nmowing","Early\nmowing","Late\nmowing","As-needed\nmowing")
+
+# same palette you used in the raw plot
+fill_cols <- c(
+  "No\nmowing"       = "#5B2A86",
+  "Early\nmowing"    = "#20A39E",
+  "Late\nmowing"     = "#277DA1",
+  "As-needed\nmowing"= "#B9E769"
+)
+
+# build a clean df for plotting from the model-based object
+mb_tbl <- emm_mb_plot %>%
+  # ensure we have the slide labels
+  mutate(
+    mowing_lab = factor(mowing_lab, levels = mow_labels),
+    # make sure letters are present
+    CLD = ifelse(is.na(.group), "", .group),
+    # slight bump for text
+    y_lab = ifelse(is.finite(ucl), ucl * 1.06, rate_m2_week * 1.06)
+  ) %>%
+  select(mowing_lab, rate_m2_week, lcl, ucl, CLD, y_lab)
+
+# y max so letters don't clip
+y_max <- max(mb_tbl$y_lab, na.rm = TRUE)
+
+ggplot(mb_tbl, aes(x = mowing_lab, y = rate_m2_week, fill = mowing_lab)) +
+  geom_col(width = 0.85) +
+  geom_errorbar(aes(ymin = pmax(lcl, 0), ymax = ucl),
+                width = 0.15, linewidth = 0.7) +
+  geom_text(aes(y = y_lab, label = CLD),
+            vjust = 0, size = 5) +   # was 4
+  coord_cartesian(ylim = c(0, y_max * 1.04)) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  labs(
+    x = NULL,
+    y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
+    title = "Weed seed rain by interrow mowing timing (model-based)",
+    caption = "*Model-based means ± bootstrap 95% CI; pooled across site-years; CLD from NB2 model"
+  ) +
+  theme_classic(base_size = 18) +    # was 16
+  theme(
+    axis.text.x  = element_text(size = 15, lineheight = 0.95),
+    plot.title   = element_text(hjust = 0.5, size = 18, face = "bold"),
+    plot.caption = element_text(hjust = 0, size = 11, color = "grey30")
+  )
+
+ggsave(
+  "fig-weed-seed-rain_mowing_model-mb_m2wk.png",
+  width = 7.5, height = 5.5, dpi = 300
+)
+
+```
+
 ```{r}
 # =========================
 # 7) IRR table (pairwise contrasts on link scale)
@@ -487,307 +554,6 @@ kable(irr_tbl, digits = 3, caption = "NB2: Incidence-rate ratios (Tukey-adjusted
 dplyr::filter(irr_tbl, grepl("late - no|no - late", contrast))
 
 ```
-
-#Figure — Overall Effect (with raw points)
-
-```{r}
-# --- constants ---
-area_m2 <- pi * (0.10/2)^2  # 0.007853982 m^2
-
-# --- newdata for predictions: one row per mowing level, with a STANDARD exposure ---
-nd <- data.frame(
-  mowing = factor(c("no","early","as_needed","late"),
-                  levels = c("no","early","as_needed","late"),
-                  ordered = TRUE),
-  offset_log_effort = log(7 * area_m2)  # 1 trap × 7 days
-)
-
-# --- direct predictions from the NB2 model (counts per trap-week) ---
-pr <- predict(m_nb,
-              newdata = nd,
-              type = "response",    # expected count
-              se.fit = TRUE,
-              re.form = NA)         # marginal over random effects
-
-# convert to seeds m^-2 week^-1
-emm_tidy <- nd %>%
-  dplyr::select(mowing) %>%
-  dplyr::mutate(
-    rate_m2_week = pr$fit / area_m2,
-    lcl          = (pr$fit - 1.96 * pr$se.fit) / area_m2,
-    ucl          = (pr$fit + 1.96 * pr$se.fit) / area_m2
-  )
-
-# (optional) compact letter display using pairwise contrasts on the LINK scale
-library(emmeans)
-emm_link <- emmeans(m_nb, ~ mowing, type = "link", offset = 0)
-cld_tbl  <- cld(emm_link, Letters = letters, adjust = "tukey") %>%
-  as.data.frame() %>% dplyr::select(mowing, .group)
-
-
-# join letters
-# define your canonical order once
-mow_levels <- c("no","early","as_needed","late")
-
-emm_plot <- emm_tidy %>%
-  dplyr::mutate(mowing = as.character(mowing)) %>%           # <- characters for join
-  dplyr::left_join(
-    cld_tbl %>% dplyr::mutate(mowing = as.character(mowing)), # <- characters for join
-    by = "mowing"
-  ) %>%
-  dplyr::mutate(
-    mowing = factor(mowing, levels = mow_levels, ordered = TRUE)  # <- restore order
-  )
-
-# raw points already in seeds m^-2 week^-1
-raw_points <- plot_total %>%
-  dplyr::select(mowing, seeds_per_m2_per_week) %>%
-  dplyr::mutate(mowing = factor(mowing, levels = c("no","early","as_needed","late"), ordered = TRUE))
-
-# --- plot (note: no "*7" anywhere; everything is already per week) ---
-ggplot() +
-  geom_point(data = raw_points,
-             aes(mowing, seeds_per_m2_per_week),
-             position = position_jitter(width = 0.12, height = 0),
-             alpha = 0.35, size = 1.8) +
-  geom_point(data = emm_plot, aes(mowing, rate_m2_week), size = 3) +
-  geom_errorbar(data = emm_plot,
-                aes(mowing, ymin = pmax(lcl, 0), ymax = ucl), width = 0.15) +
-  geom_text(data = emm_plot,
-            aes(mowing, y = ucl * 1.06, label = .group),
-            vjust = 0, size = 4) +
-  labs(x = "Interrow mowing timing",
-       y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
-       title = "Weed seed rain by interrow mowing timing (NB2)") +
-  theme_classic()
-
-# sanity check: model vs raw means should be same order of magnitude now
-print(emm_tidy)
-plot_total %>%
-  dplyr::group_by(mowing) %>%
-  dplyr::summarise(mean_raw_week = mean(seeds_per_m2_per_week, na.rm = TRUE)) %>%
-  print()
-
-
-```
-```{r}
-# model-based
-emm_tidy %>%
-  dplyr::select(mowing, rate_m2_day, rate_m2_week) %>%
-  arrange(mowing)
-
-# raw summaries
-plot_total %>%
-  dplyr::group_by(mowing) %>%
-  dplyr::summarise(
-    mean_raw_week = mean(seeds_per_m2_per_week, na.rm = TRUE),
-    median_raw_week = median(seeds_per_m2_per_week, na.rm = TRUE),
-    max_raw_week = max(seeds_per_m2_per_week, na.rm = TRUE)
-  ) %>%
-  arrange(mowing)
-
-```
-
-
-```{r}
-#Set work directory
-setwd("/Users/ey239/Github/IMT/rmarkdowns")
-
-# --- Packages ---
-library(tidyverse)
-library(janitor)
-library(lubridate)
-library(glmmTMB)
-library(DHARMa)
-library(performance)
-library(emmeans)
-library(car)            # Anova(type=3)
-library(multcomp)
-library(multcompView)
-library(broom.mixed) ##install.packages("broom.mixed")
-library(readxl)
-library(knitr)
-
-# --- Load & clean ---
-raw <- read_excel("~/Github/IMT/raw-data/combined_weed_seeds.xlsx")
-
-dat <- raw %>%
-  clean_names() %>%                        # fixes "week " -> "week"
-  # 'data' column is the collection date; rename to 'date' for clarity
-  rename(date = data,
-         mowing_code = treatment) %>%
-  mutate(
-    year      = factor(year),
-    location  = factor(location),
-    site_year = factor(site_year),
-    block     = factor(block),
-    plot      = factor(plot),
-    week      = as.integer(week),
-    date      = ymd(date)
-  )
-
-# Map treatment codes to mowing timing labels (adjust if your codes differ)
-mow_map <- c(AWC = "as_needed", EWC = "early", LWC = "late", NWC = "no")
-
-dat <- dat %>%
-  mutate(
-    mowing = dplyr::recode(mowing_code, !!!mow_map) |> 
-             factor(levels = c("no","early","as_needed","late"), ordered = TRUE)
-  )
-
-
-# --- Exposure (area × days × traps) ---
-# Constant trap area; weekly sampling => 7 days
-trap_area_m2  <- 0.0078
-interval_days <- 7L
-
-# aggregate subsamples to PLOT-WEEK (sum the 3 subsamples per week)
-plot_week <- dat %>%
-  group_by(site_year, location, block, plot, mowing, week) %>%
-  summarise(
-    seeds_week = sum(seed_number, na.rm = TRUE),
-    traps_week = sum(!is.na(seed_number)),  # <-- only non-missing traps
-    .groups = "drop_last"
-  ) %>%
-  mutate(effort_week = traps_week * trap_area_m2 * interval_days) %>%
-  ungroup()
-
-# aggregate PLOT-WEEK to PLOT-TOTAL over the season
-plot_total <- plot_week %>%
-  group_by(site_year, location, block, plot, mowing) %>%
-  summarise(
-    seeds_total   = sum(seeds_week,  na.rm = TRUE),
-    effort_total  = sum(effort_week, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    # guard against zeros
-    effort_total = if_else(effort_total <= 0 | is.na(effort_total),
-                           trap_area_m2 * interval_days, effort_total),
-    offset_log_effort = log(effort_total),
-    # OPTIONAL: reporting-only rates (do not model these)
-    seeds_per_m2_per_day = seeds_total / effort_total,
-    seeds_per_m2_per_week = seeds_per_m2_per_day * 7,
-    seeds_per_ft2_per_week = seeds_per_m2_per_week / 10.7639
-  )
-
-kable(head(plot_total), caption = "Plot-level totals & effort")
-
-# --- Modeling ---
-options(contrasts = c("contr.sum", "contr.poly"))  # set BEFORE fitting
-
-# Base Negative Binomial
-m_nb <- glmmTMB(
-  seeds_total ~ mowing + (1|site_year/block),
-  family = nbinom2(link = "log"),
-  offset = offset_log_effort,
-  data = plot_total
-)
-
-# Zero-Inflated Negative Binomial with ZI varying by mowing (as in your draft)
-m_zinb <- glmmTMB(
-  seeds_total ~ mowing + (1|site_year/block),
-  ziformula = ~ mowing,
-  family = nbinom2(link = "log"),
-  offset = offset_log_effort,
-  data = plot_total
-)
-
-# --- Diagnostics & model choice ---
-AIC(m_nb, m_zinb)
-set.seed(123)
-sim_nb   <- DHARMa::simulateResiduals(m_nb, plot = FALSE)
-sim_zinb <- DHARMa::simulateResiduals(m_zinb, plot = FALSE)
-plot(sim_nb);   testDispersion(m_nb);   testZeroInflation(m_nb)
-plot(sim_zinb); testDispersion(m_zinb); testZeroInflation(m_zinb)
-
-# Compare AICs safely
-aic_nb   <- AIC(m_nb)
-aic_zinb <- AIC(m_zinb)
-
-print(data.frame(model = c("NB","ZI-NB"), AIC = c(aic_nb, aic_zinb)))
-
-# pick ZI-NB if it's better by >2 AIC units or if NB shows zero-inflation
-best_mod <- if ((aic_zinb + 2) < aic_nb || DHARMa::testZeroInflation(m_nb)$p.value < 0.05) {
-  m_zinb
-} else {
-  m_nb
-}
-
-summary(best_mod)
-performance::check_model(best_mod)
-# --- Inference ---
-# Global Type III
-Anova(best_mod, type = 3)
-
-# Rate estimates on the response scale (per m^2 per day, because of the offset)
-emm <- emmeans(best_mod, ~ mowing, type = "response")
-emm
-
-# Pairwise + CLD
-pairs(emm, adjust = "tukey")
-cld_tbl <- cld(emm, Letters = letters, adjust = "tukey")
-kable(as.data.frame(cld_tbl), digits = 3, caption = "Estimated seed-rain rates with CLD")
-
-# --- Robust emmeans summary (works across emmeans versions) ---
-emm_sum <- summary(emm, type = "response", infer = TRUE) %>% as.data.frame()
-
-# Pick the right column names if they exist
-se_col  <- intersect(c("SE", "std.error"), names(emm_sum))[1]
-lcl_col <- intersect(c("lower.CL", "asymp.LCL"), names(emm_sum))[1]
-ucl_col <- intersect(c("upper.CL", "asymp.UCL"), names(emm_sum))[1]
-
-# Safety check in case something unexpected happens
-if (is.na(se_col) || is.na(lcl_col) || is.na(ucl_col)) {
-  stop("Could not find SE / CI columns in emmeans summary. Names were: ",
-       paste(names(emm_sum), collapse = ", "))
-}
-
-# Tidy table for reporting
-emm_tidy <- emm_sum %>%
-  transmute(
-    mowing,
-    rate_m2_day   = response,
-    se            = .data[[se_col]],
-    lcl           = .data[[lcl_col]],
-    ucl           = .data[[ucl_col]],
-    rate_m2_week  = rate_m2_day * 7,
-    rate_ft2_week = rate_m2_week / 10.7639
-  )
-
-knitr::kable(emm_tidy, digits = 3, caption = "Back-transformed seed-rain rates")
-
-# --- Plot (means ± 95% CI + CLD letters) ---
-# emmeans results on response scale
-emm_df <- as.data.frame(emm) %>%
-  dplyr::mutate(rate_m2_week = response * 7)
-
-# CLD letters, keeping only the two columns we need
-cld_df <- cld_tbl %>%
-  as.data.frame() %>%
-  dplyr::select(mowing, .group)
-
-# join letters to the emmeans dataframe
-emm_df <- dplyr::left_join(emm_df, cld_df, by = "mowing")
-
-# plot
-ggplot(emm_df, aes(x = mowing, y = rate_m2_week)) +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = (response - SE) * 7, ymax = (response + SE) * 7),
-                width = 0.15) +
-  geom_text(aes(label = .group, y = (rate_m2_week) * 1.05), vjust = 0) +
-  labs(x = "Interrow mowing timing",
-       y = expression("Estimated seed rain ("*seeds~m^{-2}~week^{-1}*")"),
-       title = "Weed seed rain by interrow mowing timing") +
-  theme_classic()
-
-```
-
-
-
-
-
-
 
 
 #Figures
