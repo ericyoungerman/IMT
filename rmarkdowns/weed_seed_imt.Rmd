@@ -32,9 +32,7 @@ conflicts_prefer(
 
 #Load & Clean
 ```{r}
-# =========================
-# 2) Load & clean
-# =========================
+
 raw <- read_excel("~/Github/IMT/raw-data/combined_weed_seeds.xlsx")
 
 dat <- raw %>%
@@ -190,60 +188,96 @@ performance::check_model(best_mod)
 # =========================
 # 5) Descriptive figure (raw means ± bootstrap CI)
 # =========================
+# 1) helper: bootstrap CI around the *mean*
 set.seed(123)
 boot_ci_mean <- function(x, B = 5000L) {
   m <- replicate(B, mean(sample(x, replace = TRUE), na.rm = TRUE))
   quantile(m, c(0.025, 0.975), na.rm = TRUE)
 }
 
-# Base codes (model) and slide labels (bars) — keep your order
-mow_keys   <- c("no","early","late","as_needed")
+# 2) order + labels to match your slides
+mow_levels <- c("no","early","late","as_needed")
 mow_labels <- c("No\nmowing","Early\nmowing","Late\nmowing","As-needed\nmowing")
 
-# Map table: label -> code (use character columns to avoid factor clashes)
-map_tbl <- tibble::tibble(
-  mow_lab = mow_labels,
-  mow_key = mow_keys
+# 3) raw (descriptive) summary with bootstrap CI
+sum_tbl <- plot_total |>
+  dplyr::mutate(mowing = factor(mowing, levels = mow_levels, labels = mow_labels)) |>
+  dplyr::group_by(mowing) |>
+  dplyr::group_modify(~{
+    x  <- .x$seeds_per_m2_per_week
+    ci <- boot_ci_mean(x)
+    tibble::tibble(
+      n_plots   = length(x),
+      mean_week = mean(x, na.rm = TRUE),
+      lcl       = unname(ci[1]),
+      ucl       = unname(ci[2])
+    )
+  }) |>
+  dplyr::ungroup()
+
+# 4) CLD from the MODEL (on link scale so offset cancels)
+library(emmeans)
+library(multcomp)
+
+emm_link <- emmeans(m_nb, ~ mowing, type = "link", offset = 0)
+cld_tbl  <- multcomp::cld(emm_link, adjust = "tukey", Letters = letters) |>
+  as.data.frame() |>
+  dplyr::transmute(
+    # model used the short codes, so map them to the same labels
+    mowing_code = as.character(mowing),
+    cld_raw     = trimws(.group)
+  )
+
+# map codes -> labels so we can join to `sum_tbl`
+code_map <- tibble::tibble(
+  mowing_code = mow_levels,
+  mowing      = mow_labels
 )
 
-# CLD on link scale (offset cancels in ratios)
-emm_link <- emmeans(m_nb, ~ mowing, type = "link", offset = 0)
-cld_tbl  <- multcomp::cld(emm_link, adjust = "tukey", Letters = letters) %>%
-  as.data.frame() %>%
-  transmute(mow_key = as.character(mowing), cld_raw = trimws(.group))
-
-# Join CLD to your bootstrap summary using character keys
-sum_tbl <- sum_tbl %>%
-  mutate(mow_lab = as.character(mowing)) %>%        # label as plain character
-  left_join(map_tbl, by = "mow_lab") %>%            # add mow_key
-  left_join(cld_tbl, by = "mow_key") %>%            # add letters
-  mutate(
-    # quick flip so higher = "a"; then alphabetize multi-letters (e.g., "ba" -> "ab")
+sum_tbl <- sum_tbl |>
+  dplyr::left_join(code_map, by = "mowing") |>
+  dplyr::left_join(cld_tbl,  by = "mowing_code") |>
+  dplyr::mutate(
+    # flip a<->b so highest = "a"
     CLD = chartr("ab", "ba", ifelse(is.na(cld_raw), "", cld_raw)),
-    CLD = sapply(strsplit(CLD, ""), function(x) paste0(sort(unique(x)), collapse = "")),
+    # if any have 2 letters, sort them so "ba" -> "ab"
+    CLD = vapply(strsplit(CLD, ""), function(x) paste0(sort(unique(x)), collapse = ""), character(1)),
+    # y position for letters
     y_lab = ifelse(is.finite(ucl), ucl * 1.06, mean_week * 1.06)
   )
 
-# Safe y-limit
+# 5) nice colors (same idea as soybean fig)
+# color-blind friendly (Okabe–Ito-ish), 4 colors
+fill_cols <- c(
+  "No\nmowing"        = "#0072B2",  # blue
+  "Early\nmowing"     = "#009E73",  # green
+  "Late\nmowing"      = "#D55E00",  # vermillion
+  "As-needed\nmowing" = "#CC79A7"   # reddish purple
+)
+
+
+# for a tidy ylim
 y_max <- max(sum_tbl$y_lab, na.rm = TRUE)
 
-# --- Plot with letters ---
+# 6) plot
 ggplot(sum_tbl, aes(x = mowing, y = mean_week, fill = mowing)) +
-  geom_col(width = 0.85) +
-  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.15, linewidth = 0.6) +
-  geom_text(aes(y = y_lab, label = CLD), vjust = 0, size = 4) +
+  geom_col(width = 0.8, color = "black") +
+  geom_errorbar(aes(ymin = lcl, ymax = ucl), width = 0.14, linewidth = 0.6) +
+  geom_text(aes(y = y_lab, label = CLD), vjust = 0, size = 4.5) +
   coord_cartesian(ylim = c(0, y_max * 1.04)) +
   scale_fill_manual(values = fill_cols, guide = "none") +
-  labs(x = NULL,
-       y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
-       title = "Weed seed rain by interrow mowing timing",
-       caption = "*Means ± bootstrap 95% CI; pooled across site-years; CLD from NB2 model") +
+  labs(
+    x = NULL,
+    y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
+    title   = "Weed seed rain by interrow mowing timing (raw, pooled)",
+    caption = "*Means ± bootstrap 95% CI; pooled across site-years; CLD from NB2 model"
+  ) +
   theme_classic(base_size = 16) +
-  theme(axis.text.x = element_text(size = 14, lineheight = 0.95),
-        plot.title  = element_text(hjust = 0.5),
-        plot.caption = element_text(hjust = 0, size = 10, color = "grey30"))
-
-
+  theme(
+    axis.text.x   = element_text(size = 13, lineheight = 0.95),
+    plot.title    = element_text(hjust = 0.5, face = "bold"),
+    plot.caption  = element_text(hjust = 0, size = 10, colour = "grey30")
+  )
 ```
 
 ```{r}
@@ -259,79 +293,152 @@ library(ggplot2)
 library(tidyr)
 library(forcats)
 
-mow_levels <- c("no","early","as_needed","late")
-mow_labels <- c("No\nmowing","Early\nmowing","As-needed\nmowing","Late\nmowing")
+# =========================
+# 5) Model-based means (averaged over site-year/block) + CLD
+# =========================
+# if you selected a different model above, do:
+# m_nb <- best_mod
 
-# 1) Compute CLD on the emmeans grid (link scale)
+area_m2 <- pi * (0.10/2)^2
+
+nd_all <- plot_total %>%
+  transmute(
+    site_year,
+    block,
+    mowing,
+    offset_log_effort = log(7 * area_m2)
+  )
+
+pr <- predict(
+  m_nb,
+  newdata = nd_all,
+  type    = "response",
+  re.form = NULL
+)
+
+emm_mb <- nd_all %>%
+  mutate(pred_trapwk = pr) %>%
+  group_by(mowing) %>%
+  summarise(
+    rate_m2_week = mean(pred_trapwk / area_m2, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+set.seed(123)
+B <- 1200
+boot_means <- replicate(B, {
+  idx <- sample.int(nrow(nd_all), replace = TRUE)
+  prb <- predict(m_nb, newdata = nd_all[idx, ], type = "response", re.form = NULL)
+  tibble(
+    mowing = nd_all$mowing[idx],
+    pred_m2wk = prb / area_m2
+  ) %>%
+    group_by(mowing) %>%
+    summarise(mean = mean(pred_m2wk), .groups = "drop")
+}, simplify = FALSE)
+
+ci_tbl <- bind_rows(boot_means, .id = "b") %>%
+  group_by(mowing) %>%
+  summarise(
+    lcl = quantile(mean, 0.025, na.rm = TRUE),
+    ucl = quantile(mean, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+emm_mb <- emm_mb %>%
+  left_join(ci_tbl, by = "mowing")
+
+# 1) levels + labels (match other figs)
+mow_levels <- c("no", "early", "as_needed", "late")
+mow_labels <- c("No\nmowing", "Early\nmowing", "As-needed\nmowing", "Late\nmowing")
+
+# 2) CLD on link scale (offset = 0 so it cancels)
 emm_link <- emmeans(m_nb, ~ mowing, type = "link", offset = 0)
 
-cld_raw <- multcomp::cld(emm_link, adjust = "tukey", Letters = letters)
-letters_tbl <- as.data.frame(cld_raw) %>%
-  transmute(mow_key = as.character(mowing), .group = trimws(.group))
+cld_raw <- multcomp::cld(emm_link, adjust = "tukey", Letters = letters) %>%
+  as.data.frame() %>%
+  transmute(
+    mow_key = as.character(mowing),
+    .group  = trimws(.group)
+  )
 
-# sanity check: see the letters we got
-knitr::kable(letters_tbl, caption = "CLD letters returned by multcomp::cld()")
-
-# 2) Join letters to your model-based means (use character key to avoid factor clashes)
+# 3) model-based table we built earlier (per m^2 per week)
 emm_mb_plot <- emm_mb %>%
   mutate(mow_key = as.character(mowing)) %>%
   select(mow_key, rate_m2_week, lcl, ucl) %>%
-  left_join(letters_tbl, by = "mow_key") %>%
+  left_join(cld_raw, by = "mow_key") %>%
   mutate(
-    .group     = replace_na(.group, ""),  # ensure printable
+    .group     = replace_na(.group, ""),
+    # reverse a/b so highest gets "a"
+    .group     = chartr("ab", "ba", .group),
+    # sort multi-letters so "ba" -> "ab"
+    .group     = sapply(strsplit(.group, ""), function(x) paste0(sort(unique(x)), collapse = "")),
     mowing     = factor(mow_key, levels = mow_levels, ordered = TRUE),
     mowing_lab = factor(mow_key, levels = mow_levels, labels = mow_labels, ordered = TRUE),
-    y_lab      = if_else(is.finite(ucl) & !is.na(ucl), ucl * 1.08, rate_m2_week * 1.08)
+    y_lab      = if_else(is.finite(ucl) & !is.na(ucl), ucl * 1.06, rate_m2_week * 1.06)
   )
 
-# 3) Raw points (unchanged; make sure labels/order match)
-raw_points <- plot_total %>%
-  transmute(
-    mow_key    = as.character(mowing),
-    mowing_lab = factor(mow_key, levels = mow_levels, labels = mow_labels, ordered = TRUE),
-    seeds_per_m2_per_week
+# 4) color-blind friendly palette, same as soybean figs
+fill_cols <- c(
+  "No\nmowing"        = "#0072B2",  # blue
+  "Early\nmowing"     = "#009E73",  # green
+  "As-needed\nmowing" = "#CC79A7",  # magenta
+  "Late\nmowing"      = "#D55E00"   # vermillion
+)
+
+# 5) plot (bars + CI + letters)
+y_max <- max(emm_mb_plot$y_lab, na.rm = TRUE)
+
+p_seed_model <- ggplot(emm_mb_plot,
+       aes(x = mowing_lab, y = rate_m2_week, fill = mowing_lab)) +
+  geom_col(width = 0.78, color = "black") +
+  geom_errorbar(aes(ymin = pmax(lcl, 0), ymax = ucl),
+                width = 0.13, linewidth = 0.6) +
+  geom_text(aes(y = y_lab, label = .group),
+            vjust = 0, size = 5) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  coord_cartesian(ylim = c(0, y_max * 1.05)) +
+  labs(
+    x = NULL,
+    y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
+    title = "Weed seed rain by interrow mowing timing",
+    caption = "*Model-based means ± bootstrap 95% CI; pooled across site-years; CLD from NB2 model."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(size = 15, lineheight = 0.95),
+    plot.title   = element_text(hjust = 0.5,size = 18, face = "bold"),
+    plot.caption = element_text(hjust = 0, size = 11, colour = "grey30")
   )
 
-# 4) Plot (letters should now appear)
-emm_mb_plot <- emm_mb_plot %>%
-  dplyr::mutate(
-    .group = chartr("ab","ba", .group),                            # swap a <-> b
-    .group = sapply(strsplit(.group, ""), function(x) paste0(sort(unique(x)), collapse = ""))
-  )
+p_seed_model
 
-y_max <- max(c(emm_mb_plot$y_lab, raw_points$seeds_per_m2_per_week), na.rm = TRUE)
-
-ggplot() +
-  geom_point(data = raw_points,
-             aes(mowing_lab, seeds_per_m2_per_week),
-             position = position_jitter(width = 0.12, height = 0),
-             alpha = 0.35, size = 1.6, color = "grey40") +
-  geom_point(data = emm_mb_plot, aes(mowing_lab, rate_m2_week), size = 3) +
-  geom_errorbar(data = emm_mb_plot,
-                aes(mowing_lab, ymin = pmax(lcl, 0), ymax = ucl),
-                width = 0.15) +
-  geom_text(data = emm_mb_plot,
-            aes(mowing_lab, y = y_lab, label = .group),
-            vjust = 0, size = 4) +
-  coord_cartesian(ylim = c(0, y_max * 1.06)) +
-  labs(x = NULL,
-       y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
-       title = "Model-based means averaged over site-year/block") +
-  theme_classic(base_size = 16) +
-  theme(axis.text.x = element_text(size = 14, lineheight = 0.95),
-        plot.title  = element_text(hjust = 0.5))
-
-# 5) Reporting table with letters
+# 6) reporting table (same letters)
 knitr::kable(
-  emm_mb_plot %>% transmute(mowing, rate_m2_week, lcl, ucl, CLD = .group),
+  emm_mb_plot %>%
+    transmute(
+      mowing = as.character(mowing_lab),
+      rate_m2_week,
+      lcl,
+      ucl,
+      CLD = .group
+    ),
   digits = 1,
-  caption = "Model-based weekly means (seeds m^-2 week^-1) with CLD letters."
+  caption = "Model-based seed rain (seeds m^-2 week^-1) with CLD letters."
+)
+
+# 7) save like the soybean figs
+ggsave(
+  "fig-seed-rain_mowing_model-mb_m2wk.png",
+  plot = p_seed_model,
+  width = 7.5, height = 5.5, dpi = 300
 )
 
 
 
-
 ```
+
+
 ```{r}
 # =========================
 # 6) Model-based means averaged over REs + fixed axis + CLD letters
@@ -509,7 +616,7 @@ ggplot(mb_tbl, aes(x = mowing_lab, y = rate_m2_week, fill = mowing_lab)) +
   labs(
     x = NULL,
     y = expression("Seed rain ("*seeds~m^{-2}~week^{-1}*")"),
-    title = "Weed seed rain by interrow mowing timing (model-based)",
+    title = "Weed seed rain by interrow mowing timing",
     caption = "*Model-based means ± bootstrap 95% CI; pooled across site-years; CLD from NB2 model"
   ) +
   theme_classic(base_size = 18) +    # was 16

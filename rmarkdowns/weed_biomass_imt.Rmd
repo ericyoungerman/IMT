@@ -164,7 +164,7 @@ Anova(model_tweedie_log, type = 3)
 #### Weed control (Significant)
 
 ```{r}
-cld_mowing_fisher <-cld(emmeans(model_tweedie_log, ~  mowing, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
+cld_mowing_fisher <-cld(emmeans(model_tweedie_log, ~  mowing|weeds|location, type = "response"), Letters = letters,adjust = "none", sort = TRUE, reversed=TRUE)
 cld_mowing_fisher
 
 
