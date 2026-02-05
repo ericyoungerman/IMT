@@ -1,17 +1,28 @@
 ---
-title: "IMT Weed seed production"
-output: github_document
+title: "Weed seed production"
+
+output:
+  github_document:
+    toc: true
+always_allow_html: true
+
+
 ---
-
+#Setup
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-<br>
-#Packages/setup
-```{r setup, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
 
-# packages only once
-library(tidyverse)
+)
+```
+
+#Packages
+```{r}
+
+# Packages ------------------------------------------------------------
+library(tidyverse)    # includes dplyr, ggplot2, readr, tibble, etc.
 library(janitor)
 library(readxl)
 library(glmmTMB)
@@ -20,28 +31,83 @@ library(emmeans)
 library(multcomp)
 library(car)
 library(kableExtra)
-
+library(here)
 library(conflicted)
+library(lme4)
+library(WrensBookshelf)
+
+# Handle conflicts ----------------------------------------------------
 conflicts_prefer(dplyr::select)
 conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::recode)
 
+# Global theme --------------------------------------------------------
+theme_set(theme_bw(base_size = 12))
 
-# helper: tidy emmeans regardless of CI column names
-tidy_emm <- function(emm_df, ref_levels = NULL) {
+# Treatment level order (use everywhere) ------------------------------
+mow_levels <- c(
+  "No mowing",
+  "Early mowing",
+  "Late mowing",
+  "As-needed mowing"
+)
+
+# One consistent CVD-safe color palette for all figures ---------------
+fill_cols <- WB_brewer(
+  name = "BlueberriesForSal",
+  n    = length(mow_levels),
+  type = "discrete"
+) |>
+  setNames(mow_levels)
+
+# x-axis label helpers ------------------------------------------------
+
+# Break on spaces (if you ever want every word on its own line)
+label_break_spaces <- function(x) {
+  stringr::str_replace_all(x, " ", "\n")
+}
+
+# Break after the comma: "Rolled,\nno control", etc.
+label_break_comma <- function(x) {
+  stringr::str_replace_all(x, ", ", ",\n")
+}
+
+# Break after comma AND split "high-residue cultivation"
+# -> "Rolled,\nhigh-residue\ncultivation"
+label_break_comma_cult <- function(x) {
+  x |>
+    stringr::str_replace("high-residue cultivation",
+                         "high-residue\ncultivation") |>
+    stringr::str_replace_all(", ", ",\n")
+}
+
+# Helper: tidy emmeans output regardless of CI column names -----------
+# (works directly on an emmeans object)
+# trt_var = name of treatment column to relevel (e.g., "weed_trt", "treatment")
+
+tidy_emm <- function(emm, trt_var = NULL, ref_levels = NULL) {
+  emm_df <- as.data.frame(emm)
+
   lcl_col <- intersect(c("lower.CL", "asymp.LCL"), names(emm_df))[1]
   ucl_col <- intersect(c("upper.CL", "asymp.UCL"), names(emm_df))[1]
+
   if (is.na(lcl_col) || is.na(ucl_col)) {
     stop("Could not find CI columns in emmeans output.")
   }
-  out <- emm_df %>%
-    mutate(
+
+  out <- emm_df |>
+    dplyr::mutate(
       ci_low  = .data[[lcl_col]],
       ci_high = .data[[ucl_col]]
     )
-  if (!is.null(ref_levels)) {
-    out <- out %>%
-      mutate(weed_trt = factor(weed_trt, levels = ref_levels))
+
+  if (!is.null(trt_var) && !is.null(ref_levels) && trt_var %in% names(out)) {
+    out <- out |>
+      dplyr::mutate(
+        !!trt_var := factor(.data[[trt_var]], levels = ref_levels)
+      )
   }
+
   out
 }
 
@@ -50,21 +116,83 @@ tidy_emm <- function(emm_df, ref_levels = NULL) {
 
 #Load & Clean
 ```{r}
+# ---------------------------------------------------------------
+# Weed seed data: read + clean + per-plot seasonal totals
+# ---------------------------------------------------------------
 
-# =========================
-# Load, clean, and area-standardize
-# =========================
-library(tidyverse)
-library(janitor)
-library(readxl)
+# Trap area (100 mm diameter; 0.10 m)
+trap_area_m2 <- pi * (0.10 / 2)^2   # ≈ 0.00785 m²
+
+# Read + clean
+seeds_all <- read_excel(
+  here("..", "raw-data", "combined_weed_seeds.xlsx"),
+  na = c("na", "Na", "NA")
+) |>
+  clean_names() |>
+  mutate(
+    year      = factor(year),
+    location  = factor(location),
+    site_year = factor(site_year),
+    block     = factor(block),
+    plot      = factor(plot),
+    week      = as.integer(week),
+
+    # Recode treatment to mowing labels consistent with mow_levels
+    weed_trt = dplyr::recode(
+      treatment,
+      "NWC" = "No mowing",
+      "EWC" = "Early mowing",
+      "LWC" = "Late mowing",
+      "AWC" = "As-needed mowing"
+    ),
+    weed_trt = factor(weed_trt, levels = mow_levels),
+
+    seed_number          = as.numeric(seed_number),
+    seeds_per_m2_sample  = seed_number / trap_area_m2
+  ) |>
+  dplyr::select(
+    sample_id, year, location, site_year, block, plot, week,
+    weed_trt, seed_number, seeds_per_m2_sample
+  )
+
+# ---- Plot-season totals normalized by total area sampled --------------
+
+plot_totals <- seeds_all |>
+  group_by(site_year, block, plot, weed_trt) |>
+  summarise(
+    seeds_total        = sum(seed_number, na.rm = TRUE),
+    # count only samples with data
+    n_samples          = sum(!is.na(seed_number)),
+    # weeks that actually have at least one non-missing sample
+    n_weeks_collected  = n_distinct(week[!is.na(seed_number)]),
+    .groups            = "drop"
+  ) |>
+  mutate(
+    area_sampled_m2       = n_samples * trap_area_m2,
+    seeds_per_m2_season   = if_else(
+      area_sampled_m2 > 0,
+      seeds_total / area_sampled_m2,
+      NA_real_
+    ),
+    seeds_per_m2_per_week = if_else(
+      n_weeks_collected > 0,
+      seeds_per_m2_season / n_weeks_collected,
+      NA_real_
+    )
+  )
+
+# quick peek
+glimpse(seeds_all)
+head(plot_totals)
+
+```
+
+```{r}
+
 
 seeds_all <- read_excel("~/Github/IMT/raw-data/combined_weed_seeds.xlsx") |>
   clean_names()
 
-# map codes -> labels (keep if already labeled)
-mow_map    <- c(NWC = "No mowing", EWC = "Early mowing",
-                AWC = "As-needed mowing", LWC = "Late mowing")
-mow_levels <- c("No mowing","Early mowing","As-needed mowing","Late mowing")
 
 # trap area (100 mm diameter)
 trap_area_m2 <- pi * (0.10/2)^2   # 0.0078539816...
@@ -114,6 +242,63 @@ head(plot_totals)
 
 ```
 #Exploratory
+
+```{r}
+# 1) Summary table: total seed rain by site-year × mowing ---------------
+#    (plot-level seasonal totals, normalized per m²)
+
+plot_totals |>
+  group_by(site_year, weed_trt) |>
+  summarise(
+    n_plots = n(),
+    mean    = mean(seeds_per_m2_season, na.rm = TRUE),
+    median  = median(seeds_per_m2_season, na.rm = TRUE),
+    sd      = sd(seeds_per_m2_season, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(site_year, weed_trt) |>
+  kable(
+    digits  = 1,
+    caption = "Weed seed rain (seeds m⁻² season⁻¹) by site-year × mowing treatment (plot-level seasonal totals)"
+  ) |>
+  kable_styling(
+    full_width        = FALSE,
+    bootstrap_options = c("striped", "hover")
+  )
+
+# 2) Faceted boxplot: all site-years -----------------------------------
+#    (plot-level seasonal seed rain per m²)
+
+plot_totals |>
+  ggplot(aes(x = weed_trt, y = seeds_per_m2_season, fill = weed_trt)) +
+  geom_boxplot(
+    outlier.shape = NA,
+    width         = 0.55,
+    color         = "black"
+  ) +
+  geom_jitter(
+    width  = 0.12,
+    height = 0,
+    alpha  = 0.4,
+    size   = 1.8,
+    color  = "grey30"
+  ) +
+  facet_wrap(~ site_year, nrow = 1) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_spaces) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x     = NULL,
+    y     = expression(Seed~rain~"(seeds"~m^{-2}~season^{-1}*")"),
+    title = "Weed seed rain by mowing treatment across site-years"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 10),
+    strip.text  = element_text(face = "bold")
+  )
+
+```
+
 ##seeds_per_m2_sample by site-year × treatment
 ```{r}
 # Ensure nice facet order + consistent treatment order
@@ -221,6 +406,7 @@ ggplot(plot_df, aes(x = mowing, y = y_plot)) +
 
 
 ```
+
 ##Clean, per-panel summaries (median + bootstrapped CI) on log scale
 ```{r}
 library(dplyr)
@@ -309,6 +495,254 @@ ggplot(sum_df, aes(mowing, med)) +
 ```
 
 #Model selection
+## comittee
+```{r}
+#### Pooled: model testing / selection for seed rain (seeds m⁻² season⁻¹) ----
+
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Use plot-level seasonal totals (per m²), drop rows with no sampling
+seed_totals <- plot_totals |>
+  filter(!is.na(seeds_per_m2_season))
+
+# Fixed: mowing × site_year
+# Random: site_year and block(site_year)
+form_seed_all <- seeds_per_m2_season ~ weed_trt * site_year +
+  (1 | site_year) +
+  (1 | site_year:block)
+
+## 1) Candidate families / structures (all with same fixed/random) ------
+
+m_seed_tw <- glmmTMB(
+  formula = form_seed_all,
+  family  = tweedie(link = "log"),
+  data    = seed_totals
+)
+
+m_seed_nb <- glmmTMB(
+  formula = form_seed_all,
+  family  = nbinom2(link = "log"),
+  data    = seed_totals
+)
+
+m_seed_tw_zi <- glmmTMB(
+  formula   = form_seed_all,
+  family    = tweedie(link = "log"),
+  ziformula = ~ 1,
+  data      = seed_totals
+)
+
+m_seed_tw_disp <- glmmTMB(
+  formula     = form_seed_all,
+  family      = tweedie(link = "log"),
+  ziformula   = ~ 1,
+  dispformula = ~ site_year,
+  data        = seed_totals
+)
+
+# Safe AIC helper -------------------------------------------------------
+safe_aic <- function(mod) {
+  out <- try(AIC(mod), silent = TRUE)
+  if (inherits(out, "try-error")) return(NA_real_)
+  out
+}
+
+aic_seed <- tibble(
+  model = c(
+    "SEED: Tweedie",
+    "SEED: NB2",
+    "SEED: Tweedie + ZI",
+    "SEED: Tweedie + ZI + disp(site_year)"
+  ),
+  AIC = c(
+    safe_aic(m_seed_tw),
+    safe_aic(m_seed_nb),
+    safe_aic(m_seed_tw_zi),
+    safe_aic(m_seed_tw_disp)
+  )
+)
+
+kable(
+  aic_seed,
+  digits  = 1,
+  caption = "Pooled seed rain (seeds m⁻² season⁻¹): candidate distributional families"
+) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+## 2) Choose best family (NA-safe, require > 2 AIC units better) --------
+
+# Start with Tweedie as baseline
+best_seed   <- m_seed_tw
+best_seed_n <- "SEED: Tweedie"
+best_aic    <- safe_aic(m_seed_tw)
+
+seed_cands <- list(
+  "SEED: NB2"                            = m_seed_nb,
+  "SEED: Tweedie + ZI"                   = m_seed_tw_zi,
+  "SEED: Tweedie + ZI + disp(site_year)" = m_seed_tw_disp
+)
+
+for (nm in names(seed_cands)) {
+  this_aic <- safe_aic(seed_cands[[nm]])
+  
+  # Only consider this candidate if its AIC is finite
+  if (is.finite(this_aic)) {
+    
+    # If the current "best" AIC is not finite, accept first finite candidate
+    if (!is.finite(best_aic) || (this_aic + 2 < best_aic)) {
+      best_seed   <- seed_cands[[nm]]
+      best_seed_n <- nm
+      best_aic    <- this_aic
+    }
+  }
+}
+
+# Final sanity check: if best_aic is still NA, everything failed
+if (!is.finite(best_aic)) {
+  stop("All candidate seed models failed (AIC is NA). Check glmmTMB fits.")
+}
+
+cat("Selected family/structure for seed rain:", best_seed_n, "\n")
+
+## 3) Final model: interaction in chosen family -------------------------
+
+# best_seed already has:
+#   seeds_per_m2_season ~ weed_trt * site_year
+# plus the chosen random/distributional structure.
+
+seed_glmm <- best_seed
+
+cat(
+  "\nSelected model for seed rain (used in all downstream emmeans/plots):\n  ",
+  "seeds_per_m2_season ~ weed_trt * site_year",
+  "\n  Family/structure:", best_seed_n, "\n"
+)
+
+## 4) Diagnostics + Type-III tests for the chosen model -----------------
+
+set.seed(123)
+res_seed <- DHARMa::simulateResiduals(seed_glmm)
+plot(res_seed)
+DHARMa::testDispersion(seed_glmm)
+DHARMa::testZeroInflation(seed_glmm)
+
+car::Anova(seed_glmm, type = 3)
+
+```
+
+```{r}
+### Seed rain (seeds m⁻² season⁻¹) with Fisher's LSD CLDs (by mowing)
+### Using Tweedie GLMM with weed_trt * site_year
+
+# Estimated marginal means for weed_trt on the response scale (seeds/m²/season)
+emm_seed <- emmeans(
+  seed_glmm,
+  ~ weed_trt,
+  type = "response"   # back-transform from log link
+)
+
+# Tidy emmeans for reporting
+emm_seed_df <- tidy_emm(
+  emm_seed,
+  trt_var    = "weed_trt",
+  ref_levels = mow_levels
+) |>
+  dplyr::rename(
+    emmean = response    # rename mean on response scale
+  ) |>
+  dplyr::select(
+    weed_trt, emmean, SE, ci_low, ci_high
+  ) |>
+  dplyr::mutate(
+    dplyr::across(c(emmean, SE, ci_low, ci_high), ~ round(.x, 1))
+  )
+
+# Compact letter display (Fisher's LSD, no adjustment; "a" = highest seed rain)
+cld_seed <- cld(
+  emm_seed,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE   # so "a" = highest seed rain group(s)
+) |>
+  as_tibble() |>
+  mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    .group   = stringr::str_trim(.group)
+  ) |>
+  select(weed_trt, .group)
+
+# Join emmeans + CLDs and format for reporting
+emm_seed_df |>
+  left_join(cld_seed, by = "weed_trt") |>
+  kable(
+    caption   = "Estimated weed seed rain (seeds m⁻² season⁻¹) by mowing treatment (pooled over site-years) with 95% CI and Fisher's LSD group letters from a Tweedie GLMM.",
+    col.names = c("Mowing treatment", "Mean", "SE", "Lower CI", "Upper CI", "Group")
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+```
+```{r}
+#### Figure: Seed rain by mowing treatment (raw means ± SE, model CLDs)
+
+# 1) Raw plot-level means and SE by mowing ------------------------------
+raw_seed_summary <- plot_totals |>
+  filter(!is.na(seeds_per_m2_season)) |>
+  group_by(weed_trt) |>
+  summarise(
+    n    = n(),
+    mean = mean(seeds_per_m2_season, na.rm = TRUE),
+    sd   = sd(seeds_per_m2_season, na.rm = TRUE),
+    se   = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    ymin     = pmax(mean - se, 0),
+    ymax     = mean + se
+  )
+
+# 2) Use the CLDs we already computed (cld_seed) ------------------------
+plot_df_seed <- raw_seed_summary |>
+  left_join(cld_seed, by = "weed_trt")
+
+# 3) Plot ---------------------------------------------------------------
+ggplot(plot_df_seed, aes(x = weed_trt, y = mean, fill = weed_trt)) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  geom_text(
+    aes(y = ymax * 1.08, label = .group),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 6
+  ) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_spaces) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y = expression(Seed~rain~"(seeds"~m^{-2}*")"),
+    title   = "Weed seed rain by mowing treatment"
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+# 4) Save figure --------------------------------------------------------
+ggsave(
+  filename = here("figures", "fig_seed_rain_mowing_pooled_raw.png"),
+  width    = 7.5,
+  height   = 5.5,
+  dpi      = 300
+)
+
+```
+
 ##pooled all sites
 ```{r}
 # =========================

@@ -1,50 +1,107 @@
 ---
-title: "IMT bean population"
-output: github_document
+title: "Dry bean population"
+
+output:
+  github_document:
+    toc: true
+always_allow_html: true
+
 ---
-
+# Setup
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.path = "analysis/figs/bean_population-"
+)
 ```
-
 # Load libraries
 
+
 ```{r message=FALSE, warning=FALSE}
-
-#Set work directory
-setwd("/Users/ey239/Github/IMT/rmarkdowns")
-
-#Load packages 
-library(tidyverse) ##install.packages("tidyverse")
-library(knitr)
-library(patchwork) ##install.packages("patchwork")
-library(skimr)     ##install.packages("skimr")
+# Packages ------------------------------------------------------------
+library(tidyverse)
+library(janitor)
 library(readxl)
-library(janitor) ##install.packages("janitor")
+library(glmmTMB)
+library(DHARMa)
+library(emmeans)
+library(multcomp)
+library(car)
+library(kableExtra)
+library(here)
+library(conflicted)
+library(lme4)
+library(WrensBookshelf)
 
-library(kableExtra) ##install.packages("kableExtra")
+# Handle conflicts ----------------------------------------------------
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::recode)
 
-library(viridis) ##install.packages("viridis")
-library(lme4) ##install.packages("lme4")
-library(lmerTest) ##install.packages("lmerTest")
-library(emmeans) ##install.packages("emmeans")
-library(rstatix) ##install.packages("rstatix")
-#library(Matrix) ##install.packages("Matrix")
-library(multcomp) ##install.packages("multcomp")
-library(multcompView) ##install.packages("multcompView")
-library(ggResidpanel) ##install.packages("ggResidpanel")
-#library(car)
-#library(TMB)  ##install.packages("TMB")
-library(glmmTMB)  ##install.packages("glmmTMB")
-library(DHARMa)  ##install.packages("DHARMa")
-library(performance) ##install.packages("performance")
-library(WrensBookshelf)##install.packages("WrensBookshelf")
-#Load Functions
-MeanPlusSe<-function(x) mean(x)+plotrix::std.error(x)
+# Global theme --------------------------------------------------------
+theme_set(theme_bw(base_size = 12))
 
-find_logw0=function(x){c=trunc(log(min(x[x>0],na.rm=T)))
-d=exp(c)
-return(d)}
+# Mowing treatment levels (use everywhere) ----------------------------
+mow_levels <- c(
+  "No mowing",
+  "Early mowing",
+  "Late mowing",
+  "As-needed mowing"
+)
+
+# Color palette -------------------------------------------------------
+fill_cols <- WB_brewer(
+  name = "BlueberriesForSal",
+  n    = length(mow_levels),
+  type = "discrete"
+) |>
+  setNames(mow_levels)
+
+# Label helpers -------------------------------------------------------
+label_break_spaces <- function(x) {
+  stringr::str_replace_all(x, " ", "\n")
+}
+
+label_break_comma <- function(x) {
+  stringr::str_replace_all(x, ", ", ",\n")
+}
+
+label_break_comma_cult <- function(x) {
+  x |>
+    stringr::str_replace("high-residue cultivation",
+                         "high-residue\ncultivation") |>
+    stringr::str_replace_all(", ", ",\n")
+}
+
+# Generic emmeans tidy helper -----------------------------------------
+tidy_emm <- function(emm, trt_var = NULL, ref_levels = NULL) {
+  emm_df <- as.data.frame(emm)
+
+  lcl_col <- intersect(c("lower.CL", "asymp.LCL"), names(emm_df))[1]
+  ucl_col <- intersect(c("upper.CL", "asymp.UCL"), names(emm_df))[1]
+
+  if (is.na(lcl_col) || is.na(ucl_col)) {
+    stop("Could not find CI columns in emmeans output.")
+  }
+
+  out <- emm_df |>
+    dplyr::mutate(
+      ci_low  = .data[[lcl_col]],
+      ci_high = .data[[ucl_col]]
+    )
+
+  if (!is.null(trt_var) && !is.null(ref_levels) && trt_var %in% names(out)) {
+    out <- out |>
+      dplyr::mutate(
+        !!trt_var := factor(.data[[trt_var]], levels = ref_levels)
+      )
+  }
+
+  out
+}
+
 ```
 
 <br>

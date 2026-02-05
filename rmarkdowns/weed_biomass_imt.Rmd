@@ -8,6 +8,15 @@ always_allow_html: true
 
 
 ---
+#Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
+
+)
+```
 #Packages
 ```{r}
 # Packages ------------------------------------------------------------
@@ -23,6 +32,9 @@ library(kableExtra)
 library(here)
 library(conflicted)
 library(lme4)
+library(purrr)
+library(tibble)
+library(stringr)
 library(WrensBookshelf)
 
 # Handle conflicts ----------------------------------------------------
@@ -104,8 +116,117 @@ tidy_emm <- function(emm, trt_var = NULL, ref_levels = NULL) {
 ```
 
 
-# Load and clean data
+
 # Data import & prep
+
+```{r}
+# IMT weed biomass data import & cleaning (2023–2025) ------------------
+
+# 1) List of raw files (comment out any you don't have yet) -------------
+weed_files <- c(
+  here("..", "data", "raw", "cornell_raw_2023.xlsx"),
+  here("..", "data", "raw", "cornell_raw_2024.xlsx"),
+  here("..", "data", "raw", "cornell_raw_2025.xlsx"),
+  
+  here("..", "data", "raw", "farmhub_raw_2023.xlsx"),
+  here("..", "data", "raw", "farmhub_raw_2024.xlsx"),
+  here("..", "data", "raw", "farmhub_raw_2025.xlsx"),
+  
+  here("..", "data", "raw", "maine_raw_2023.xlsx"),
+  here("..", "data", "raw", "maine_raw_2024.xlsx"),
+  here("..", "data", "raw", "maine_raw_2025.xlsx"),
+  
+  here("..", "data", "raw", "vermont_raw_2023.xlsx"),
+  here("..", "data", "raw", "vermont_raw_2024.xlsx"),
+  here("..", "data", "raw", "vermont_raw_2025.xlsx"),
+  
+  here("..", "data", "raw", "wisconsin_raw_2023.xlsx"),
+  here("..", "data", "raw", "wisconsin_raw_2024.xlsx"),
+  here("..", "data", "raw", "wisconsin_raw_2025.xlsx")
+)
+
+# Quick sanity check
+weed_files
+file.exists(weed_files)
+
+# 2) Robust helper to read + standardize a single file ------------------
+read_weed_file <- function(path) {
+  dat <- read_excel(path, na = c("na", "Na", "NA")) |>
+    clean_names()
+  
+  fname <- basename(path)
+  
+  # Derive location label from filename (used if column is missing)
+  loc_label <- dplyr::case_when(
+    stringr::str_detect(fname, "cornell")   ~ "Cornell",
+    stringr::str_detect(fname, "farmhub")   ~ "FarmHub",
+    stringr::str_detect(fname, "maine")     ~ "Maine",
+    stringr::str_detect(fname, "vermont")   ~ "Vermont",
+    stringr::str_detect(fname, "wisconsin") ~ "Wisconsin",
+    TRUE                                    ~ "Unknown"
+  )
+  
+  # Derive year from filename (used if column is missing)
+  year_val <- stringr::str_extract(fname, "20[0-9]{2}")
+  
+  # If location / year columns are missing, create them -----------------
+  if (!"location" %in% names(dat)) {
+    dat$location <- loc_label
+  }
+  if (!"year" %in% names(dat)) {
+    dat$year <- year_val
+  }
+  # If site_year is missing, create it from location + year -------------
+  if (!"site_year" %in% names(dat)) {
+    dat$site_year <- paste(dat$location, dat$year, sep = "_")
+  }
+  
+  dat |>
+    mutate(
+      location  = factor(location),
+      year      = factor(year),
+      site_year = factor(site_year),
+      block     = factor(block),
+      microplot = stringr::str_trim(microplot),
+      # match your old rename(weed_trt = treatment) + recode
+      weed_trt  = dplyr::recode(
+        treatment,
+        "NWC" = "No mowing",
+        "EWC" = "Early mowing",
+        "LWC" = "Late mowing",
+        "AWC" = "As-needed mowing"
+      ),
+      weed_trt  = factor(weed_trt, levels = mow_levels)
+    )
+}
+
+# 3) Read all files, stack, and compute per-area biomass ----------------
+weed_biomass_clean <- purrr::map_df(weed_files, read_weed_file) |>
+  filter(!is.na(weed_biomass)) |>
+  mutate(
+    # all biomass originally in g per 0.5 m^2 quadrat
+    weed_biomass_g_m2           = weed_biomass          * 2,
+    weed_biomass_kg_ha          = weed_biomass          * 20,
+    inrow_weed_biomass_g_m2     = intrarow_weed_biomass * 2,
+    inrow_weed_biomass_kg_ha    = intrarow_weed_biomass * 20,
+    interrow_weed_biomass_g_m2  = interrow_weed_biomass * 2,
+    interrow_weed_biomass_kg_ha = interrow_weed_biomass * 20
+  )
+
+# 4) Quick checks -------------------------------------------------------
+kable(
+  head(weed_biomass_clean),
+  caption = "All IMT site-years (2023–2025), cleaned weed biomass"
+)
+
+weed_biomass_clean |>
+  count(site_year, weed_trt) |>
+  arrange(site_year, weed_trt)
+
+
+
+```
+
 ``` {r}
 weed_biomass_clean <- read_excel(
   here("..", "raw-data", "combined_raw.xlsx"),
@@ -151,6 +272,8 @@ kable(
 ```{r}
 # 2) Subset for weed biomass models: ambient vs surrogate only ---------
 
+# 2) Subset for weed biomass models: ambient vs surrogate only ---------
+
 weed_biomass_bi <- weed_biomass_clean |>
   mutate(
     weeds = dplyr::recode(
@@ -162,38 +285,63 @@ weed_biomass_bi <- weed_biomass_clean |>
     weeds = factor(weeds, levels = c("Ambient weeds", "Surrogate weeds"))
   ) |>
   filter(!is.na(weeds))    # drop WF for biomass analysis only
+
+# Quick check: which locations are present? -----------------------------
+
+weed_biomass_bi |>
+  count(location) |>
+  kable(
+    caption = "Number of ambient/surrogate weed microplots by location"
+  ) |>
+  kable_styling(full_width = FALSE)
+
+# 3) Define Ecobean (all sites) and NY-only subsets --------------------
+
+# Ecobean = all five locations in the IMT network
+weed_biomass_eco <- weed_biomass_bi |>
+  filter(location %in% c("CU", "FH", "ME", "VT", "WI")) |>
+  droplevels()
+
+# New York only = Cornell + Farm Hub
+weed_biomass_ny <- weed_biomass_bi |>
+  filter(location %in% c("CU", "FH")) |>
+  droplevels()
+
+# Optional: quick sanity check of site-years in each subset ------------
+
+weed_biomass_eco |>
+  count(site_year) |>
+  kable(
+    caption = "Ecobean subset: ambient/surrogate weed microplots by site-year"
+  ) |>
+  kable_styling(full_width = FALSE)
+
+weed_biomass_ny |>
+  count(site_year) |>
+  kable(
+    caption = "NY-only subset: ambient/surrogate weed microplots by site-year"
+  ) |>
+  kable_styling(full_width = FALSE)
+
 ```
 
 # Model testing
 ## Exploratory 
 ###Total weed biomass (kg ha⁻¹) by site-year × treatment
 ```{r}
-# 1) Summary table: total weed biomass by site-year × treatment ---------
-# (Ambient + surrogate weed microplots only)
+## Exploratory: total weed biomass (kg ha⁻¹) by site-year × mowing -----
 
-weed_biomass_bi |>
-  group_by(site_year, weed_trt) |>
-  summarise(
-    n       = n(),
-    mean    = mean(weed_biomass_kg_ha, na.rm = TRUE),
-    median  = median(weed_biomass_kg_ha, na.rm = TRUE),
-    sd      = sd(weed_biomass_kg_ha, na.rm = TRUE),
-    .groups = "drop"
+## 1A) Ecobean (all five locations, 2023–2025) -------------------------
+
+
+
+weed_biomass_eco |>
+  mutate(
+    # Order years 2023 (top) → 2025 (bottom)
+    year     = factor(year, levels = c(2023, 2024, 2025)),
+    # Order sites left → right
+    location = factor(location, levels = c("CU", "FH", "ME", "VT", "WI"))
   ) |>
-  arrange(site_year, weed_trt) |>
-  kable(
-    digits  = 1,
-    caption = "Weed biomass (kg ha⁻¹) by site-year × mowing treatment (ambient + surrogate weeds only)"
-  ) |>
-  kable_styling(
-    full_width        = FALSE,
-    bootstrap_options = c("striped", "hover")
-  )
-
-# 2) Faceted boxplot: all site-years -----------------------------------
-# (Ambient + surrogate weed microplots only)
-
-weed_biomass_bi |>
   ggplot(aes(x = weed_trt, y = weed_biomass_kg_ha, fill = weed_trt)) +
   geom_boxplot(
     outlier.shape = NA,
@@ -207,14 +355,64 @@ weed_biomass_bi |>
     size   = 1.8,
     color  = "grey30"
   ) +
-  facet_wrap(~ site_year, nrow = 1) +
+  facet_grid(year ~ location) +   # <- strips will just be 2023, 2024, 2025, CU, FH, ...
   scale_fill_manual(values = fill_cols, guide = "none") +
   scale_x_discrete(labels = label_break_spaces) +
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x     = NULL,
     y     = expression(Weed~biomass~"(kg"~ha^{-1}*")"),
-    title = "Weed biomass by mowing treatment across site-years (ambient + surrogate weeds)"
+    title = "Ecobean: weed biomass by mowing treatment"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 9),
+    strip.text  = element_text(face = "bold")
+  )
+
+
+## 1B) New York only (Cornell + Farm Hub) ------------------------------
+
+weed_biomass_ny |>
+  group_by(site_year, weed_trt) |>
+  summarise(
+    n       = n(),
+    mean    = mean(weed_biomass_kg_ha, na.rm = TRUE),
+    median  = median(weed_biomass_kg_ha, na.rm = TRUE),
+    sd      = sd(weed_biomass_kg_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(site_year, weed_trt) |>
+  kable(
+    digits  = 1,
+    caption = "New York only (Cornell + Farm Hub)"
+  ) |>
+  kable_styling(
+    full_width        = FALSE,
+    bootstrap_options = c("striped", "hover")
+  )
+
+weed_biomass_ny |>
+  ggplot(aes(x = weed_trt, y = weed_biomass_kg_ha, fill = weed_trt)) +
+  geom_boxplot(
+    outlier.shape = NA,
+    width         = 0.55,
+    color         = "black"
+  ) +
+  geom_jitter(
+    width  = 0.12,
+    height = 0,
+    alpha  = 0.4,
+    size   = 1.8,
+    color  = "grey30"
+  ) +
+  facet_wrap(~ site_year, nrow = 2) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_spaces) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x     = NULL,
+    y     = expression(Weed~biomass~"(kg"~ha^{-1}*")"),
+    title = "New York only (Cornell + Farm Hub)"
   ) +
   theme(
     axis.text.x = element_text(size = 10),
@@ -409,6 +607,7 @@ emm_wbm_df |>
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 
 ```
+
 ```{r}
 ### Total weed biomass (kg ha⁻¹) by weeds treatment (ambient vs surrogate)
 
