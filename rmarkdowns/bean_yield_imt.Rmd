@@ -1,8 +1,639 @@
 ---
-title: "IMT Bean yield"
-output: github_document
----
+title: "Bean Yield"
 
+output:
+  github_document:
+    toc: true
+always_allow_html: true
+
+
+---
+#Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
+
+)
+```
+#Packages
+```{r}
+# Packages ------------------------------------------------------------
+library(tidyverse)    # includes dplyr, ggplot2, readr, tibble, etc.
+library(janitor)
+library(readxl)
+library(glmmTMB)
+library(DHARMa)
+library(emmeans)
+library(multcomp)
+library(car)
+library(kableExtra)
+library(here)
+library(conflicted)
+library(lme4)
+library(WrensBookshelf)
+
+# Handle conflicts ----------------------------------------------------
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::recode)
+
+# Global theme --------------------------------------------------------
+theme_set(theme_bw(base_size = 12))
+
+# Treatment level order (use everywhere) ------------------------------
+mow_levels <- c(
+  "No mowing",
+  "Early mowing",
+  "Late mowing",
+  "As-needed mowing"
+)
+
+# One consistent CVD-safe color palette for all figures ---------------
+fill_cols <- WB_brewer(
+  name = "BlueberriesForSal",
+  n    = length(mow_levels),
+  type = "discrete"
+) |>
+  setNames(mow_levels)
+
+# x-axis label helpers ------------------------------------------------
+
+# Break on spaces (if you ever want every word on its own line)
+label_break_spaces <- function(x) {
+  stringr::str_replace_all(x, " ", "\n")
+}
+
+# Break after the comma: "Rolled,\nno control", etc.
+label_break_comma <- function(x) {
+  stringr::str_replace_all(x, ", ", ",\n")
+}
+
+# Break after comma AND split "high-residue cultivation"
+# -> "Rolled,\nhigh-residue\ncultivation"
+label_break_comma_cult <- function(x) {
+  x |>
+    stringr::str_replace("high-residue cultivation",
+                         "high-residue\ncultivation") |>
+    stringr::str_replace_all(", ", ",\n")
+}
+
+# Helper: tidy emmeans output regardless of CI column names -----------
+# (works directly on an emmeans object)
+# trt_var = name of treatment column to relevel (e.g., "weed_trt", "treatment")
+
+tidy_emm <- function(emm, trt_var = NULL, ref_levels = NULL) {
+  emm_df <- as.data.frame(emm)
+
+  lcl_col <- intersect(c("lower.CL", "asymp.LCL"), names(emm_df))[1]
+  ucl_col <- intersect(c("upper.CL", "asymp.UCL"), names(emm_df))[1]
+
+  if (is.na(lcl_col) || is.na(ucl_col)) {
+    stop("Could not find CI columns in emmeans output.")
+  }
+
+  out <- emm_df |>
+    dplyr::mutate(
+      ci_low  = .data[[lcl_col]],
+      ci_high = .data[[ucl_col]]
+    )
+
+  if (!is.null(trt_var) && !is.null(ref_levels) && trt_var %in% names(out)) {
+    out <- out |>
+      dplyr::mutate(
+        !!trt_var := factor(.data[[trt_var]], levels = ref_levels)
+      )
+  }
+
+  out
+}
+
+
+```
+# Data import
+```{r}
+#--- Yield conversions ---------------------------------------------------
+
+# Constants
+moisture_correction <- (100 - 0.00001) / (100 - 14)  # to 14% moisture
+grams_per_lb        <- 454
+sqft_per_acre       <- 43560
+sample_area_sqft    <- 16.4
+lb_per_kg           <- 2.20462
+ac_per_ha           <- 2.47105          # 1 ha = 2.47105 ac
+lb_ac_to_kg_ha      <- (1 / lb_per_kg) * ac_per_ha  # ≈ 1.12085
+
+# Read + clean master, then compute adjusted yields ---------------------
+
+bean_yield_clean <- read_excel(
+  here("..", "raw-data", "combined_raw.xlsx"),
+  na = c("na", "Na", "NA")
+) |>
+  clean_names() |>
+  rename(weed_trt = treatment) |>
+  mutate(
+    year      = factor(year),
+    location  = factor(location),
+    site_year = factor(site_year),
+    block     = factor(block),
+    microplot = stringr::str_trim(microplot),
+    weed_trt  = recode(
+      weed_trt,
+      "NWC" = "No mowing",
+      "EWC" = "Early mowing",
+      "LWC" = "Late mowing",
+      "AWC" = "As-needed mowing"
+    ),
+    weed_trt = factor(weed_trt, levels = mow_levels)
+  ) |>
+  # keep rows with non-missing yield
+  filter(!is.na(bean_yield)) |>
+  # yield conversions: g per 16.4 ft² -> bu/ac, lb/ac, kg/ha
+  mutate(
+    # lb/ac at observed moisture
+    bean_yield_lbs_acre = (bean_yield / grams_per_lb) /
+      (sample_area_sqft / sqft_per_acre),
+
+    # adjust to 14% moisture
+    bean_yield_adj_lbs_acre = bean_yield_lbs_acre * moisture_correction,
+
+    # bu/ac (60 lb/bu)
+    bean_yield_adj_bu_acre = (bean_yield_adj_lbs_acre / 60),
+
+    # kg/ha (corrected)
+    bean_yield_adj_kg_ha = bean_yield_adj_lbs_acre * lb_ac_to_kg_ha
+  )
+
+```
+
+## Subsets
+```{r}
+#---------------------------------------------------------------
+# Analysis subsets for bean yield
+#---------------------------------------------------------------
+
+# 1) Add weediness factors (2-level and 3-level) ----------------
+
+bean_yield_clean <- bean_yield_clean |>
+  mutate(
+    # 3-level weeds factor (for later NWC weed-free vs weedy work)
+    weeds3 = dplyr::recode(
+      microplot,
+      "M"  = "Ambient weeds",
+      "SW" = "Surrogate weeds",
+      "WF" = "Weed-free",
+      .default = NA_character_
+    ),
+    weeds3 = factor(
+      weeds3,
+      levels = c("Ambient weeds", "Surrogate weeds", "Weed-free")
+    ),
+
+    # 2-level weeds factor for balanced mowing × weeds analysis
+    weeds2 = dplyr::recode(
+      microplot,
+      "M"  = "Ambient weeds",
+      "SW" = "Surrogate weeds",
+      .default = NA_character_
+    ),
+    weeds2 = factor(weeds2, levels = c("Ambient weeds", "Surrogate weeds"))
+  )
+
+# 2) Main yield dataset for mowing × weeds (ambient + surrogate) --------
+
+bean_yield_bi <- bean_yield_clean |>
+  filter(!is.na(weeds2))
+
+# 3) No-mowing subset: weed-free vs weedy (for later comparison) --------
+
+bean_yield_nwm_weedsfree <- bean_yield_clean |>
+  filter(
+    weed_trt == "No mowing",
+    microplot %in% c("M", "SW", "WF")
+  ) |>
+  mutate(
+    weed_status = dplyr::recode(
+      microplot,
+      "WF" = "Weed-free",
+      "M"  = "Weedy",
+      "SW" = "Weedy",
+      .default = NA_character_
+    ),
+    weed_status = factor(weed_status, levels = c("Weedy", "Weed-free"))
+  )
+
+# Quick sanity checks ---------------------------------------------------
+
+kable(
+  head(bean_yield_bi),
+  caption = "Bean yield dataset for mowing × weeds analysis (ambient + surrogate only)"
+)
+
+kable(
+  head(bean_yield_nwm_weedsfree),
+  caption = "No-mowing subset for weed-free vs weedy yield comparisons"
+)
+
+```
+
+# Model testing
+## Exploratory
+```{r}
+# 1) Summary table: bean yield by site-year × mowing --------------------
+# (Ambient + surrogate weed microplots only; WF excluded)
+
+bean_yield_bi |>
+  group_by(site_year, weed_trt) |>
+  summarise(
+    n       = n(),
+    mean    = mean(bean_yield_adj_kg_ha, na.rm = TRUE),
+    median  = median(bean_yield_adj_kg_ha, na.rm = TRUE),
+    sd      = sd(bean_yield_adj_kg_ha, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(site_year, weed_trt) |>
+  kable(
+    digits  = 1,
+    caption = "Bean yield (kg ha⁻¹) by site-year × mowing treatment (ambient + surrogate weeds only)"
+  ) |>
+  kable_styling(
+    full_width        = FALSE,
+    bootstrap_options = c("striped", "hover")
+  )
+
+# 2) Faceted boxplot: bean yield across site-years ----------------------
+# (Ambient + surrogate weed microplots only; WF excluded)
+
+bean_yield_bi |>
+  ggplot(aes(x = weed_trt, y = bean_yield_adj_kg_ha, fill = weed_trt)) +
+  geom_boxplot(
+    outlier.shape = NA,
+    width         = 0.55,
+    color         = "black"
+  ) +
+  geom_jitter(
+    width  = 0.12,
+    height = 0,
+    alpha  = 0.4,
+    size   = 1.8,
+    color  = "grey30"
+  ) +
+  facet_wrap(~ site_year, nrow = 1) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_spaces) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x     = NULL,
+    y     = expression(Bean~yield~"(kg"~ha^{-1}*")"),
+    title = "Bean yield by mowing treatment across site-years (ambient + surrogate weeds)"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 10),
+    strip.text  = element_text(face = "bold")
+  )
+
+```
+## Selection
+```{r}
+## Selection
+### Bean yield (kg ha⁻¹)
+
+#### Pooled: mixed model for bean yield (kg ha⁻¹) ----------------------
+
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Fixed: mowing × weeds (ambient vs surrogate) + site_year
+# Random: split-plot structure (site_year, block(site_year), mowing within block(site_year))
+
+# Final bean-yield model (use this one downstream)
+yield_lmm <- lmer(
+  bean_yield_adj_kg_ha ~ weed_trt * weeds2 + site_year +
+    (1 | site_year:block) +
+    (1 | site_year:block:weed_trt),
+  data = bean_yield_bi
+)
+
+# Quick model summary
+summary(yield_lmm)
+
+## Diagnostics -----------------------------------------------------------
+
+set.seed(123)
+res_yield <- DHARMa::simulateResiduals(yield_lmm)
+plot(res_yield)
+DHARMa::testDispersion(yield_lmm)
+DHARMa::testZeroInflation(yield_lmm)
+
+## Type-III tests --------------------------------------------------------
+
+anova_yield <- car::Anova(yield_lmm, type = 3)
+anova_yield
+
+
+```
+
+```{r}
+### Bean yield (kg ha⁻¹) by mowing treatment (no CLDs)
+### (ambient + surrogate weed microplots only)
+
+# Estimated marginal means for weed_trt on the response scale (kg/ha)
+emm_yield <- emmeans(
+  yield_lmm,
+  ~ weed_trt
+)
+
+# Use your tidy_emm helper to standardize CI columns
+emm_yield_df <- tidy_emm(
+  emm_yield,
+  trt_var    = "weed_trt",
+  ref_levels = mow_levels
+) |>
+  select(weed_trt, emmean, SE, ci_low, ci_high) |>
+  mutate(
+    across(c(emmean, SE, ci_low, ci_high), ~ round(.x, 1))
+  )
+
+emm_yield_df |>
+  kable(
+    caption   = "Estimated bean yield (kg ha⁻¹) by mowing treatment (ambient + surrogate weeds), with 95% CI from a linear mixed model. Mowing had no significant effect on yield (p = 0.16).",
+    col.names = c("Treatment", "Mean", "SE", "Lower CI", "Upper CI")
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+```
+## Equivalence testing
+```{r}
+## Equivalence testing
+### Are mowing treatments "close enough" to the no-mowing control?
+
+# 1) EMMs for bean yield -----------------------------------------------
+emm_yield <- emmeans(yield_lmm, ~ weed_trt)
+
+# Name of the control treatment (must match mow_levels exactly)
+control_trt <- "No mowing"
+
+# Extract treatment levels from emmGrid
+trt_levels <- levels(emm_yield)$weed_trt
+
+# Check the reference actually exists
+if (!control_trt %in% trt_levels) {
+  stop(
+    "control_trt ('", control_trt, "') is not a level of weed_trt.\n",
+    "Current levels are: ",
+    paste(trt_levels, collapse = ", ")
+  )
+}
+
+# 2) Define equivalence margin (as % of control yield) -----------------
+
+# Model-based control yield (kg ha⁻¹)
+control_mean <- summary(emm_yield) |>
+  as_tibble() |>
+  dplyr::filter(weed_trt == control_trt) |>
+  dplyr::pull(emmean)
+
+margin_pct <- 0.10        # e.g., 0.10 = ±10% of control yield
+delta_kg   <- margin_pct * control_mean
+
+# For interpretation: convert margin to bu ac⁻¹ (approx)
+kg_per_bu_ac <- 67.25     # ≈ kg ha⁻¹ per 1 bu ac⁻¹ for dry bean (60 lb bu⁻¹)
+delta_bu_ac  <- delta_kg / kg_per_bu_ac
+
+cat(
+  "Equivalence margin:",
+  sprintf("±%.0f kg ha⁻¹ (≈ ±%.1f bu ac⁻¹, %.0f%% of No mowing yield)\n",
+          delta_kg, delta_bu_ac, margin_pct * 100)
+)
+
+# 3) Contrasts: each treatment vs No mowing ----------------------------
+yield_vs_control <- contrast(
+  emm_yield,
+  method = "trt.vs.ctrl",
+  ref    = which(trt_levels == control_trt)
+)
+
+# 4) TOST-style equivalence tests via emmeans --------------------------
+equiv_yield <- summary(
+  yield_vs_control,
+  infer  = c(TRUE, TRUE),     # show CI + tests
+  level  = 0.90,              # 1 - 2*0.05 for α = 0.05 equivalence
+  side   = "equivalence",     # two one-sided tests (TOST)
+  delta  = delta_kg,
+  adjust = "none"
+) |>
+  as_tibble() |>
+  mutate(
+    diff_bu_ac  = estimate / kg_per_bu_ac,
+    lower_bu_ac = lower.CL / kg_per_bu_ac,
+    upper_bu_ac = upper.CL / kg_per_bu_ac,
+    p_equiv     = p.value
+  )
+
+# 5) Nicely formatted table for the Rmd --------------------------------
+equiv_yield_table <- equiv_yield |>
+  transmute(
+    Contrast    = contrast,
+    diff_kg_ha  = estimate,
+    lower_kg_ha = lower.CL,
+    upper_kg_ha = upper.CL,
+    diff_bu_ac,
+    lower_bu_ac,
+    upper_bu_ac,
+    p_equiv
+  ) |>
+  mutate(
+    across(
+      c(diff_kg_ha, lower_kg_ha, upper_kg_ha,
+        diff_bu_ac, lower_bu_ac, upper_bu_ac),
+      ~ round(.x, 1)
+    ),
+    p_equiv = signif(p_equiv, 3)
+  ) |>
+  kable(
+    caption = paste0(
+      "Equivalence tests for bean yield vs ",
+      control_trt,
+      " (margin = ±",
+      round(delta_kg, 0), " kg ha⁻¹ ≈ ±",
+      round(delta_bu_ac, 1), " bu ac⁻¹; ",
+      round(margin_pct * 100), "% of control yield)."
+    ),
+    col.names = c(
+      "Contrast",
+      "Difference (kg ha⁻¹)", "Lower 90% CI", "Upper 90% CI",
+      "Difference (bu ac⁻¹)", "Lower 90% CI", "Upper 90% CI",
+      "p (equiv.)"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+equiv_yield_table
+
+```
+```{r}
+## Equivalence testing
+### Are other mowing treatments "close enough" to Early mowing?
+
+# 1) EMMs for bean yield -----------------------------------------------
+emm_yield <- emmeans(yield_lmm, ~ weed_trt)
+
+# Name of the reference treatment (must match mow_levels exactly)
+control_trt <- "Early mowing"
+
+# Extract treatment levels from emmGrid
+trt_levels <- levels(emm_yield)$weed_trt
+
+# Check the reference actually exists
+if (!control_trt %in% trt_levels) {
+  stop(
+    "control_trt ('", control_trt, "') is not a level of weed_trt.\n",
+    "Current levels are: ",
+    paste(trt_levels, collapse = ", ")
+  )
+}
+
+# 2) Define equivalence margin (as % of Early mowing yield) ------------
+
+# Model-based Early mowing yield (kg ha⁻¹)
+control_mean <- summary(emm_yield) |>
+  as_tibble() |>
+  dplyr::filter(weed_trt == control_trt) |>
+  dplyr::pull(emmean)
+
+margin_pct <- 0.10        # e.g., 0.10 = ±10% of Early mowing yield
+delta_kg   <- margin_pct * control_mean
+
+# For interpretation: convert margin to bu ac⁻¹ (approx)
+kg_per_bu_ac <- 67.25     # ≈ kg ha⁻¹ per 1 bu ac⁻¹ for dry bean (60 lb bu⁻¹)
+delta_bu_ac  <- delta_kg / kg_per_bu_ac
+
+cat(
+  "Equivalence margin:",
+  sprintf("±%.0f kg ha⁻¹ (≈ ±%.1f bu ac⁻¹, %.0f%% of %s yield)\n",
+          delta_kg, delta_bu_ac, margin_pct * 100, control_trt)
+)
+
+# 3) Contrasts: each treatment vs Early mowing -------------------------
+yield_vs_control <- contrast(
+  emm_yield,
+  method = "trt.vs.ctrl",
+  ref    = which(trt_levels == control_trt)
+)
+
+# 4) TOST-style equivalence tests via emmeans --------------------------
+equiv_yield <- summary(
+  yield_vs_control,
+  infer  = c(TRUE, TRUE),     # show CI + tests
+  level  = 0.90,              # 1 - 2*0.05 for α = 0.05 equivalence
+  side   = "equivalence",     # two one-sided tests (TOST)
+  delta  = delta_kg,
+  adjust = "none"
+) |>
+  as_tibble() |>
+  mutate(
+    diff_bu_ac  = estimate / kg_per_bu_ac,
+    lower_bu_ac = lower.CL / kg_per_bu_ac,
+    upper_bu_ac = upper.CL / kg_per_bu_ac,
+    p_equiv     = p.value
+  )
+
+# 5) Nicely formatted table for the Rmd --------------------------------
+equiv_yield_table <- equiv_yield |>
+  transmute(
+    Contrast    = contrast,
+    diff_kg_ha  = estimate,
+    lower_kg_ha = lower.CL,
+    upper_kg_ha = upper.CL,
+    diff_bu_ac,
+    lower_bu_ac,
+    upper_bu_ac,
+    p_equiv
+  ) |>
+  mutate(
+    across(
+      c(diff_kg_ha, lower_kg_ha, upper_kg_ha,
+        diff_bu_ac, lower_bu_ac, upper_bu_ac),
+      ~ round(.x, 1)
+    ),
+    p_equiv = signif(p_equiv, 3)
+  ) |>
+  kable(
+    caption = paste0(
+      "Equivalence tests for bean yield vs ",
+      control_trt,
+      " (margin = ±",
+      round(delta_kg, 0), " kg ha⁻¹ ≈ ±",
+      round(delta_bu_ac, 1), " bu ac⁻¹; ",
+      round(margin_pct * 100), "% of ", control_trt, " yield)."
+    ),
+    col.names = c(
+      "Contrast",
+      "Difference (kg ha⁻¹)", "Lower 90% CI", "Upper 90% CI",
+      "Difference (bu ac⁻¹)", "Lower 90% CI", "Upper 90% CI",
+      "p (equiv.)"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+equiv_yield_table
+
+```
+
+# Figures
+## Pooled
+```{r}
+
+#### Raw means (kg ha⁻¹)
+### Figure: Bean yield by mowing treatment (raw means ± SE)
+### (ambient + surrogate weed microplots only)
+
+# 1) Raw means and SE by treatment --------------------------------------
+raw_yield_summary <- bean_yield_bi |>
+  group_by(weed_trt) |>
+  summarise(
+    n    = n(),
+    mean = mean(bean_yield_adj_kg_ha, na.rm = TRUE),
+    sd   = sd(bean_yield_adj_kg_ha, na.rm = TRUE),
+    se   = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    ymin     = pmax(mean - se, 0),
+    ymax     = mean + se
+  )
+
+# 2) Plot ---------------------------------------------------------------
+ggplot(raw_yield_summary, aes(x = weed_trt, y = mean, fill = weed_trt)) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_spaces) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
+    title   = "Bean yield by mowing treatment"
+    
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+# 3) Save figure --------------------------------------------------------
+ggsave(
+  filename = here("figures", "fig_bean_yield_mowing_pooled_raw.png"),
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+```
 
 
 ```{r setup, include=FALSE}
