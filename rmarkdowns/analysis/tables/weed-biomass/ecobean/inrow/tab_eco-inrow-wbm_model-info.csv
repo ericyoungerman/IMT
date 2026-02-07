@@ -1,0 +1,2 @@
+response_label,family_structure,fixed_effects,random_effects,AIC_additive,AIC_interaction,deltaAIC_add_int,LRT_p_int_raw,LRT_p_int_label,interaction_class
+"Ecobean IN-ROW weed biomass (kg ha^-1), model-predicted means*",ECO-IN: Tweedie + ZI(~1),Additive (gray zone): weed_trt + weeds + site_year,(1 | site_year) + (1 | site_year:block) + (1 | site_year:block:weed_trt),4842.58,4842.06,0.52,0.05126794429040043,0.051,gray_zone

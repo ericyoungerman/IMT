@@ -1,0 +1,4 @@
+Effect,P-value
+Mowing treatment (weed_trt),<0.001
+Weediness (weeds: ambient vs surrogate),<0.001
+Site-year,<0.001

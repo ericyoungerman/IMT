@@ -1,0 +1,4 @@
+Effect,P-value
+Site-year (site_year),<0.001
+Mowing treatment (weed_trt),<0.001
+Weediness (weeds),0.072

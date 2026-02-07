@@ -1,0 +1,2 @@
+response_label,family_structure,fixed_effects,random_effects,AIC_additive,AIC_interaction,deltaAIC_add_int,LRT_p_int_raw,LRT_p_int_label,interaction_class
+"Weed biomass (kg ha^-1), New York only, model-predicted means*",NY: Tweedie + ZI(~1) + disp(site_year),Additive (gray zone): weed_trt + weeds + site_year,(1 | site_year) + (1 | site_year:block) + (1 | site_year:block:weed_trt),2856.71,2860.07,-3.37,0.19517230622007323,0.195,gray_zone

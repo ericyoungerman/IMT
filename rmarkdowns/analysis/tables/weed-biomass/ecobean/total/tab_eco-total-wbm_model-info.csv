@@ -1,0 +1,2 @@
+response_label,family_structure,fixed_effects,random_effects,AIC_additive,AIC_interaction,deltaAIC_add_int,LRT_p_int_raw,LRT_p_int_label,interaction_class
+"Total weed biomass (kg ha^-1), Ecobean model-predicted means*",ECO: NB2,Additive (gray zone): weed_trt + weeds + site_year,(1 | site_year) + (1 | site_year:block) + (1 | site_year:block:weed_trt),7285.22,7294.63,-9.41,0.8580130906573527,0.858,gray_zone
