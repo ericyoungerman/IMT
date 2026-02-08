@@ -1,0 +1,4 @@
+Effect,P-value
+Mowing (weed_trt),0.022
+Site-year,<0.001
+Mowing × Site-year (weed_trt × site_year),0.100

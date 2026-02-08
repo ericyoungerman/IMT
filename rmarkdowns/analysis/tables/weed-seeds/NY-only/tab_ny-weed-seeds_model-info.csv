@@ -1,0 +1,2 @@
+response_label,family_structure,fixed_effects,random_effects,AIC_additive,AIC_interaction,deltaAIC_add_int,LRT_p_int_raw,LRT_p_int_label,interaction_class
+"Weed seed rain (seeds m^-2 season^-1), NY-only model-predicted means*",Tweedie GLMM (log link),Additive: weed_trt + site_year,(1 | site_year:block),885.69,889.71,-4.02,0.12298807015421329,0.123,additive

@@ -1,0 +1,5 @@
+weed_trt,model_mean,SE,ci_low,ci_high,trt_CLD,raw_mean,raw_CLD
+No mowing,418.8,100.8,261.3,671.2,a,1102.9,a
+Early mowing,357.2,86.4,222.4,573.7,ab,874.8,ab
+Late mowing,203.9,52.6,123,338.1,c,530.5,c
+As-needed mowing,256.2,64.5,156.5,419.5,bc,547.5,bc
