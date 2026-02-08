@@ -1,0 +1,2 @@
+response_label,family_structure,fixed_effects,random_effects,AIC_additive,AIC_interaction,deltaAIC_add_int,LRT_p_int_raw,LRT_p_int_label,interaction_class
+"Bean yield (kg ha^-1, adjusted to 14% moisture), NY-only, model-predicted means*",Gaussian LMM (identity link),Additive: weed_trt + weeds + site_year,(1 | site_year) + (1 | site_year:block) + (1 | site_year:block:weed_trt),2866.67,2872.04,-5.37,0.8893374754178901,0.889,gray_zone

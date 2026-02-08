@@ -1,0 +1,25 @@
+site_year,weed_trt,model_mean,int_CLD,raw_mean,raw_CLD
+CU_2023,No mowing,2458.2,a,2352.9,a
+CU_2023,Early mowing,2551.4,a,2285.1,a
+CU_2023,Late mowing,2574.3,a,2827.8,a
+CU_2023,As-needed mowing,2607,a,2724.8,a
+CU_2024,No mowing,2335.4,a,2343.2,a
+CU_2024,Early mowing,2428.6,a,2607.4,a
+CU_2024,Late mowing,2451.5,a,2176,a
+CU_2024,As-needed mowing,2484.2,a,2572.9,a
+CU_2025,No mowing,148.8,a,202.6,a
+CU_2025,Early mowing,242,a,232.3,a
+CU_2025,Late mowing,264.9,a,253.9,a
+CU_2025,As-needed mowing,297.6,a,240.5,a
+FH_2023,No mowing,2455.3,a,2466.9,a
+FH_2023,Early mowing,2548.4,a,2577.1,a
+FH_2023,Late mowing,2571.4,a,2614,a
+FH_2023,As-needed mowing,2604,a,2521,a
+FH_2024,No mowing,1483.5,a,1391.7,a
+FH_2024,Early mowing,1576.7,a,1651.5,a
+FH_2024,Late mowing,1599.6,a,1616.6,a
+FH_2024,As-needed mowing,1632.3,a,1633.2,a
+FH_2025,No mowing,101.7,a,225.7,a
+FH_2025,Early mowing,194.8,a,164.9,a
+FH_2025,Late mowing,217.7,a,190.9,a
+FH_2025,As-needed mowing,250.4,a,183.1,a

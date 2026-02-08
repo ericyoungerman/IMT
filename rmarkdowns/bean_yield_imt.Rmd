@@ -55,11 +55,12 @@ mow_levels <- c(
 
 # One consistent CVD-safe color palette for all figures ---------------
 fill_cols <- WB_brewer(
-  name = "BlueberriesForSal",
+  name = "LittleBlueHouseBesideTheSea1",
   n    = length(mow_levels),
   type = "discrete"
 ) |>
   setNames(mow_levels)
+
 
 # x-axis label helpers ------------------------------------------------
 
@@ -767,7 +768,1801 @@ emm_yield_df |>
   kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
 
 ```
-## Equivalence testing
+# Summary tables
+###Ecobean
+```{r}
+## Ecobean: bean yield (kg ha^-1, 14% moisture) summary tables ----------
+
+# Directory for all Ecobean bean-yield tables ---------------------------
+tab_dir_yield_eco <- here("analysis", "tables", "bean-yield", "Ecobean")
+dir.create(tab_dir_yield_eco, showWarnings = FALSE, recursive = TRUE)
+
+
+## 1) P-value summary (mowing, weediness, site-year, + LRT) --------------
+
+anova_yield_eco <- car::Anova(yield_lmm_eco, type = 3)
+
+anova_yield_eco_df <- anova_yield_eco |>
+  as.data.frame() |>
+  tibble::rownames_to_column("Effect")
+
+p_trt_eco   <- anova_yield_eco_df$`Pr(>Chisq)`[anova_yield_eco_df$Effect == "weed_trt"]
+p_weeds_eco <- anova_yield_eco_df$`Pr(>Chisq)`[anova_yield_eco_df$Effect == "weeds"]
+p_site_eco  <- anova_yield_eco_df$`Pr(>Chisq)`[anova_yield_eco_df$Effect == "site_year"]
+
+pvals_yield_eco <- tibble::tibble(
+  Effect = c(
+    "Mowing (weed_trt)",
+    "Weediness (weeds)",
+    "Site-year"
+  ),
+  p_raw = c(p_trt_eco, p_weeds_eco, p_site_eco)
+)
+
+# Add mowing × weediness row from LRT, even though final model is additive
+pvals_yield_eco <- pvals_yield_eco |>
+  dplyr::bind_rows(
+    tibble::tibble(
+      Effect = "Mowing × Weediness (weed_trt × weeds)",
+      p_raw  = p_int_yield_eco
+    )
+  ) |>
+  dplyr::mutate(
+    `P-value` = dplyr::case_when(
+      p_raw < 0.001 ~ "<0.001",
+      p_raw < 0.01  ~ "<0.01",
+      TRUE          ~ sprintf("%.3f", p_raw)
+    )
+  ) |>
+  dplyr::select(Effect, `P-value`)
+
+# Save ANOVA/LRT p-value summary
+readr::write_csv(
+  pvals_yield_eco,
+  file.path(tab_dir_yield_eco, "tab_eco-bean-yield_Anova_pvals.csv")
+)
+
+pvals_yield_eco |>
+  kable(
+    caption   = "Ecobean bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): ANOVA and LRT p-values",
+    col.names = c("Effect", "P-value")
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 2) Site-year means (model + raw) -------------------------------------
+
+emm_loc_yield_eco <- emmeans(
+  yield_lmm_eco,
+  ~ site_year,
+  type = "response"
+)
+
+emm_loc_yield_eco_df <- as_tibble(emm_loc_yield_eco) |>
+  dplyr::mutate(
+    site_year  = as.factor(site_year),
+    # For Gaussian LMM, emmeans returns `emmean`
+    model_mean = emmean
+  ) |>
+  dplyr::select(site_year, model_mean)
+
+cld_loc_yield_eco <- multcomp::cld(
+  emm_loc_yield_eco,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    site_year = as.factor(site_year),
+    loc_CLD   = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(site_year, loc_CLD)
+
+raw_loc_yield_eco <- bean_yield_eco |>
+  dplyr::group_by(site_year) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(site_year = as.factor(site_year))
+
+loc_summary_yield_eco <- emm_loc_yield_eco_df |>
+  dplyr::left_join(cld_loc_yield_eco, by = "site_year") |>
+  dplyr::left_join(raw_loc_yield_eco, by = "site_year") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    raw_mean   = round(raw_mean, 1),
+    raw_CLD    = loc_CLD
+  ) |>
+  dplyr::arrange(site_year)
+
+readr::write_csv(
+  loc_summary_yield_eco,
+  file.path(tab_dir_yield_eco, "tab_eco-bean-yield_site-year_means_CLD.csv")
+)
+
+loc_summary_yield_eco |>
+  kable(
+    caption   = "Ecobean bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): site-year means with CLDs",
+    col.names = c("Site-year", "Model mean", "Model CLD", "Raw mean", "Raw CLD")
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 3) Mowing means (model + raw) ----------------------------------------
+
+emm_trt_yield_eco <- emmeans(
+  yield_lmm_eco,
+  ~ weed_trt,
+  type = "response"
+)
+
+emm_trt_yield_eco_tmp <- tidy_emm(
+  emm_trt_yield_eco,
+  trt_var    = "weed_trt",
+  ref_levels = mow_levels
+)
+
+emm_trt_yield_eco_df <- emm_trt_yield_eco_tmp |>
+  dplyr::mutate(
+    weed_trt   = factor(weed_trt, levels = mow_levels),
+    model_mean = if ("response" %in% names(emm_trt_yield_eco_tmp))
+      response else emmean
+  ) |>
+  dplyr::select(weed_trt, model_mean, SE, ci_low, ci_high)
+
+cld_trt_yield_eco <- multcomp::cld(
+  emm_trt_yield_eco,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE   # "a" = highest yield group
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    trt_CLD  = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(weed_trt, trt_CLD)
+
+raw_trt_yield_eco <- bean_yield_eco |>
+  dplyr::group_by(weed_trt) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(weed_trt = factor(weed_trt, levels = mow_levels))
+
+trt_summary_yield_eco <- emm_trt_yield_eco_df |>
+  dplyr::left_join(cld_trt_yield_eco, by = "weed_trt") |>
+  dplyr::left_join(raw_trt_yield_eco, by = "weed_trt") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    SE         = round(SE, 1),
+    ci_low     = round(ci_low, 1),
+    ci_high    = round(ci_high, 1),
+    raw_mean   = round(raw_mean, 1),
+    raw_CLD    = trt_CLD
+  ) |>
+  dplyr::arrange(weed_trt)
+
+# Save treatment summary
+readr::write_csv(
+  trt_summary_yield_eco,
+  file.path(tab_dir_yield_eco, "tab_eco-bean-yield_mowing_means_CLD.csv")
+)
+
+trt_summary_yield_eco |>
+  kable(
+    caption   = "Ecobean bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): mowing-treatment means with CLDs",
+    col.names = c(
+      "Treatment", "Model mean", "SE",
+      "Lower CI", "Upper CI",
+      "Model CLD", "Raw mean", "Raw CLD"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 3b) Weediness means (ambient vs surrogate; model + raw) --------------
+
+emm_weeds_yield_eco <- emmeans(
+  yield_lmm_eco,
+  ~ weeds,
+  type = "response"
+)
+
+emm_weeds_yield_eco_tmp <- tidy_emm(
+  emm_weeds_yield_eco,
+  trt_var    = "weeds",
+  ref_levels = c("Ambient weeds", "Surrogate weeds")
+)
+
+emm_weeds_yield_eco_df <- emm_weeds_yield_eco_tmp |>
+  dplyr::mutate(
+    weeds      = factor(weeds, levels = c("Ambient weeds", "Surrogate weeds")),
+    model_mean = if ("response" %in% names(emm_weeds_yield_eco_tmp))
+      response else emmean
+  ) |>
+  dplyr::select(weeds, model_mean, SE, ci_low, ci_high)
+
+cld_weeds_yield_eco <- multcomp::cld(
+  emm_weeds_yield_eco,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    weeds     = factor(weeds, levels = c("Ambient weeds", "Surrogate weeds")),
+    weeds_CLD = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(weeds, weeds_CLD)
+
+raw_weeds_yield_eco <- bean_yield_eco |>
+  dplyr::group_by(weeds) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(
+    weeds = factor(weeds, levels = c("Ambient weeds", "Surrogate weeds"))
+  )
+
+weediness_summary_yield_eco <- emm_weeds_yield_eco_df |>
+  dplyr::left_join(cld_weeds_yield_eco,  by = "weeds") |>
+  dplyr::left_join(raw_weeds_yield_eco, by = "weeds") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    SE         = round(SE, 1),
+    ci_low     = round(ci_low, 1),
+    ci_high    = round(ci_high, 1),
+    raw_mean   = round(raw_mean, 1)
+  ) |>
+  dplyr::arrange(weeds)
+
+# Save weediness summary
+readr::write_csv(
+  weediness_summary_yield_eco,
+  file.path(tab_dir_yield_eco, "tab_eco-bean-yield_weediness_means_CLD.csv")
+)
+
+weediness_summary_yield_eco |>
+  kable(
+    caption   = "Ecobean bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): weediness (ambient vs surrogate) means with CLDs",
+    col.names = c(
+      "Weediness", "Model mean", "SE",
+      "Lower CI", "Upper CI",
+      "Model CLD", "Raw mean"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 4) Site-year × mowing means (model + raw) -----------------------------
+
+emm_sy_yield_eco <- emmeans(
+  yield_lmm_eco,
+  ~ weed_trt | site_year,
+  type = "response"
+)
+
+emm_sy_yield_eco_tmp <- as_tibble(emm_sy_yield_eco)
+
+emm_sy_yield_eco_df <- emm_sy_yield_eco_tmp |>
+  dplyr::mutate(
+    site_year  = as.factor(site_year),
+    weed_trt   = factor(weed_trt, levels = mow_levels),
+    model_mean = if ("response" %in% names(emm_sy_yield_eco_tmp))
+      response else emmean
+  ) |>
+  dplyr::select(site_year, weed_trt, model_mean)
+
+cld_sy_yield_eco <- multcomp::cld(
+  emm_sy_yield_eco,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    site_year = as.factor(site_year),
+    weed_trt  = factor(weed_trt, levels = mow_levels),
+    int_CLD   = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(site_year, weed_trt, int_CLD)
+
+raw_sy_yield_eco <- bean_yield_eco |>
+  dplyr::group_by(site_year, weed_trt) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(
+    site_year = as.factor(site_year),
+    weed_trt  = factor(weed_trt, levels = mow_levels)
+  )
+
+int_summary_yield_eco <- emm_sy_yield_eco_df |>
+  dplyr::left_join(cld_sy_yield_eco, by = c("site_year", "weed_trt")) |>
+  dplyr::left_join(raw_sy_yield_eco, by = c("site_year", "weed_trt")) |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    raw_mean   = round(raw_mean, 1),
+    raw_CLD    = int_CLD
+  ) |>
+  dplyr::arrange(site_year, weed_trt)
+
+# Save interaction summary
+readr::write_csv(
+  int_summary_yield_eco,
+  file.path(tab_dir_yield_eco, "tab_eco-bean-yield_site-year_treatment_means_CLD.csv")
+)
+
+int_summary_yield_eco |>
+  kable(
+    caption   = "Ecobean bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): site-year \u00d7 treatment means with CLDs",
+    col.names = c(
+      "Site-year", "Treatment",
+      "Model mean", "Model CLD",
+      "Raw mean",   "Raw CLD"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 5) Model-info row for global yield summary ---------------------------
+
+model_info_yield_eco <- tibble::tibble(
+  response_label    = "Bean yield (kg ha^-1, adjusted to 14% moisture), Ecobean model-predicted means*",
+  family_structure  = family_structure_yield_eco,
+  fixed_effects     = primary_model_name_yield_eco,
+  random_effects    = "(1 | site_year) + (1 | site_year:block) + (1 | site_year:block:weed_trt)",
+  AIC_additive      = round(AIC_add_yield_eco, 2),
+  AIC_interaction   = round(AIC_int_yield_eco, 2),
+  deltaAIC_add_int  = round(deltaAIC_yield_eco, 2),
+  LRT_p_int_raw     = p_int_yield_eco,
+  LRT_p_int_label   = dplyr::case_when(
+    p_int_yield_eco < 0.001 ~ "<0.001",
+    p_int_yield_eco < 0.01  ~ "<0.01",
+    TRUE                    ~ sprintf("%.3f", p_int_yield_eco)
+  ),
+  interaction_class = interaction_class_yield_eco
+)
+
+readr::write_csv(
+  model_info_yield_eco,
+  file.path(tab_dir_yield_eco, "tab_eco-bean-yield_model-info.csv")
+)
+
+
+## 6) OPTIONAL: combine into one Ecobean bean-yield workbook ------------
+
+if (requireNamespace("writexl", quietly = TRUE)) {
+  yield_tables_eco <- list(
+    Anova_pvals          = pvals_yield_eco,
+    SiteYear_means_CLD   = loc_summary_yield_eco,
+    Mowing_means_CLD     = trt_summary_yield_eco,
+    Weediness_means_CLD  = weediness_summary_yield_eco,
+    SiteYear_trt_means   = int_summary_yield_eco,
+    Model_info           = model_info_yield_eco
+  )
+  
+  writexl::write_xlsx(
+    yield_tables_eco,
+    path = file.path(tab_dir_yield_eco, "Ecobean_bean-yield_all-tables.xlsx")
+  )
+} else {
+  message("Package 'writexl' not installed; skipping Ecobean bean-yield Excel export.")
+}
+
+```
+
+
+###New York only
+```{r}
+## NY-only bean yield (kg ha^-1, adjusted to 14% moisture): summary tables ----
+
+# Directory for NY-only yield tables -----------------------------------
+tab_dir_yield_ny <- here("analysis", "tables", "bean-yield", "NY-only")
+dir.create(tab_dir_yield_ny, showWarnings = FALSE, recursive = TRUE)
+
+
+## 1) P-value summary (mowing, weediness, site-year, + LRT) -------------
+
+anova_yield_ny <- car::Anova(yield_lmm_ny, type = 3)
+
+anova_yield_ny_df <- anova_yield_ny |>
+  as.data.frame() |>
+  tibble::rownames_to_column("Effect")
+
+p_trt_yield_ny  <- anova_yield_ny_df$`Pr(>Chisq)`[anova_yield_ny_df$Effect == "weed_trt"]
+p_weeds_yield_ny <- anova_yield_ny_df$`Pr(>Chisq)`[anova_yield_ny_df$Effect == "weeds"]
+p_site_yield_ny <- anova_yield_ny_df$`Pr(>Chisq)`[anova_yield_ny_df$Effect == "site_year"]
+
+pvals_yield_ny <- tibble::tibble(
+  Effect = c(
+    "Mowing (weed_trt)",
+    "Weediness (weeds)",
+    "Site-year"
+  ),
+  p_raw = c(p_trt_yield_ny, p_weeds_yield_ny, p_site_yield_ny)
+)
+
+# Add mowing × weediness row from LRT (even if we kept additive model)
+pvals_yield_ny <- pvals_yield_ny |>
+  dplyr::bind_rows(
+    tibble::tibble(
+      Effect = "Mowing × Weediness (weed_trt × weeds)",
+      p_raw  = p_int_yield_ny
+    )
+  ) |>
+  dplyr::mutate(
+    `P-value` = dplyr::case_when(
+      p_raw < 0.001 ~ "<0.001",
+      p_raw < 0.01  ~ "<0.01",
+      TRUE          ~ sprintf("%.3f", p_raw)
+    )
+  ) |>
+  dplyr::select(Effect, `P-value`)
+
+# Save ANOVA/LRT p-value summary
+readr::write_csv(
+  pvals_yield_ny,
+  file.path(tab_dir_yield_ny, "tab_ny-bean-yield_Anova_pvals.csv")
+)
+
+pvals_yield_ny |>
+  kable(
+    caption   = "NY-only bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): ANOVA and LRT p-values",
+    col.names = c("Effect", "P-value")
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 2) Site-year means (model + raw) ------------------------------------
+
+emm_loc_yield_ny <- emmeans(
+  yield_lmm_ny,
+  ~ site_year
+)
+
+emm_loc_yield_ny_df <- as_tibble(emm_loc_yield_ny) |>
+  dplyr::mutate(
+    site_year  = as.factor(site_year),
+    # For Gaussian LMM, use emmean directly
+    model_mean = emmean
+  ) |>
+  dplyr::select(site_year, model_mean)
+
+cld_loc_yield_ny <- multcomp::cld(
+  emm_loc_yield_ny,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    site_year = as.factor(site_year),
+    loc_CLD   = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(site_year, loc_CLD)
+
+raw_loc_yield_ny <- bean_yield_ny |>
+  dplyr::group_by(site_year) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(site_year = as.factor(site_year))
+
+loc_summary_yield_ny <- emm_loc_yield_ny_df |>
+  dplyr::left_join(cld_loc_yield_ny, by = "site_year") |>
+  dplyr::left_join(raw_loc_yield_ny, by = "site_year") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    raw_mean   = round(raw_mean, 1),
+    raw_CLD    = loc_CLD
+  ) |>
+  dplyr::arrange(site_year)
+
+readr::write_csv(
+  loc_summary_yield_ny,
+  file.path(tab_dir_yield_ny, "tab_ny-bean-yield_site-year_means_CLD.csv")
+)
+
+loc_summary_yield_ny |>
+  kable(
+    caption   = "NY-only bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): site-year means with CLDs",
+    col.names = c("Site-year", "Model mean", "Model CLD", "Raw mean", "Raw CLD")
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 3) Mowing-treatment means (model + raw) ------------------------------
+
+emm_trt_yield_ny <- emmeans(
+  yield_lmm_ny,
+  ~ weed_trt
+)
+
+emm_trt_yield_ny_df <- tidy_emm(
+  emm_trt_yield_ny,
+  trt_var    = "weed_trt",
+  ref_levels = mow_levels
+) |>
+  dplyr::mutate(
+    weed_trt   = factor(weed_trt, levels = mow_levels),
+    model_mean = emmean
+  ) |>
+  dplyr::select(weed_trt, model_mean, SE, ci_low, ci_high)
+
+cld_trt_yield_ny <- multcomp::cld(
+  emm_trt_yield_ny,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    trt_CLD  = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(weed_trt, trt_CLD)
+
+raw_trt_yield_ny <- bean_yield_ny |>
+  dplyr::group_by(weed_trt) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(weed_trt = factor(weed_trt, levels = mow_levels))
+
+trt_summary_yield_ny <- emm_trt_yield_ny_df |>
+  dplyr::left_join(cld_trt_yield_ny, by = "weed_trt") |>
+  dplyr::left_join(raw_trt_yield_ny, by = "weed_trt") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    SE         = round(SE, 1),
+    ci_low     = round(ci_low, 1),
+    ci_high    = round(ci_high, 1),
+    raw_mean   = round(raw_mean, 1),
+    raw_CLD    = trt_CLD
+  ) |>
+  dplyr::arrange(weed_trt)
+
+readr::write_csv(
+  trt_summary_yield_ny,
+  file.path(tab_dir_yield_ny, "tab_ny-bean-yield_mowing_means_CLD.csv")
+)
+
+trt_summary_yield_ny |>
+  kable(
+    caption   = "NY-only bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): mowing-treatment means with CLDs",
+    col.names = c(
+      "Treatment", "Model mean", "SE",
+      "Lower CI", "Upper CI",
+      "Model CLD", "Raw mean", "Raw CLD"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 4) Weediness means (ambient vs surrogate) ----------------------------
+
+emm_weeds_yield_ny <- emmeans(
+  yield_lmm_ny,
+  ~ weeds
+)
+
+emm_weeds_yield_ny_df <- tidy_emm(
+  emm_weeds_yield_ny,
+  trt_var    = "weeds",
+  ref_levels = levels(bean_yield_ny$weeds)
+) |>
+  dplyr::mutate(
+    weeds      = factor(weeds, levels = levels(bean_yield_ny$weeds)),
+    model_mean = emmean
+  ) |>
+  dplyr::select(weeds, model_mean, SE, ci_low, ci_high)
+
+cld_weeds_yield_ny <- multcomp::cld(
+  emm_weeds_yield_ny,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    weeds     = factor(weeds, levels = levels(bean_yield_ny$weeds)),
+    weeds_CLD = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(weeds, weeds_CLD)
+
+raw_weeds_yield_ny <- bean_yield_ny |>
+  dplyr::group_by(weeds) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(
+    weeds = factor(weeds, levels = levels(bean_yield_ny$weeds))
+  )
+
+weeds_summary_yield_ny <- emm_weeds_yield_ny_df |>
+  dplyr::left_join(cld_weeds_yield_ny,  by = "weeds") |>
+  dplyr::left_join(raw_weeds_yield_ny,  by = "weeds") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    SE         = round(SE, 1),
+    ci_low     = round(ci_low, 1),
+    ci_high    = round(ci_high, 1),
+    raw_mean   = round(raw_mean, 1)
+  ) |>
+  dplyr::arrange(weeds)
+
+readr::write_csv(
+  weeds_summary_yield_ny,
+  file.path(tab_dir_yield_ny, "tab_ny-bean-yield_weediness_means_CLD.csv")
+)
+
+weeds_summary_yield_ny |>
+  kable(
+    caption   = "NY-only bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): weediness (ambient vs surrogate) means with CLDs",
+    col.names = c(
+      "Weediness", "Model mean", "SE",
+      "Lower CI", "Upper CI",
+      "Model CLD", "Raw mean"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 5) Site-year × mowing means (interaction block) ----------------------
+
+emm_sy_yield_ny <- emmeans(
+  yield_lmm_ny,
+  ~ weed_trt | site_year
+)
+
+emm_sy_yield_ny_df <- as_tibble(emm_sy_yield_ny) |>
+  dplyr::mutate(
+    site_year  = as.factor(site_year),
+    weed_trt   = factor(weed_trt, levels = mow_levels),
+    model_mean = emmean
+  ) |>
+  dplyr::select(site_year, weed_trt, model_mean)
+
+cld_sy_yield_ny <- multcomp::cld(
+  emm_sy_yield_ny,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    site_year = as.factor(site_year),
+    weed_trt  = factor(weed_trt, levels = mow_levels),
+    int_CLD   = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(site_year, weed_trt, int_CLD)
+
+raw_sy_yield_ny <- bean_yield_ny |>
+  dplyr::group_by(site_year, weed_trt) |>
+  dplyr::summarise(
+    raw_mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    .groups  = "drop"
+  ) |>
+  dplyr::mutate(
+    site_year = as.factor(site_year),
+    weed_trt  = factor(weed_trt, levels = mow_levels)
+  )
+
+int_summary_yield_ny <- emm_sy_yield_ny_df |>
+  dplyr::left_join(cld_sy_yield_ny, by = c("site_year", "weed_trt")) |>
+  dplyr::left_join(raw_sy_yield_ny, by = c("site_year", "weed_trt")) |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    raw_mean   = round(raw_mean, 1),
+    raw_CLD    = int_CLD
+  ) |>
+  dplyr::arrange(site_year, weed_trt)
+
+readr::write_csv(
+  int_summary_yield_ny,
+  file.path(tab_dir_yield_ny, "tab_ny-bean-yield_site-year_treatment_means_CLD.csv")
+)
+
+int_summary_yield_ny |>
+  kable(
+    caption   = "NY-only bean yield (kg ha\u207b\u00b9, adjusted to 14% moisture): site-year × mowing-treatment means with CLDs",
+    col.names = c(
+      "Site-year", "Treatment",
+      "Model mean", "Model CLD",
+      "Raw mean",   "Raw CLD"
+    )
+  ) |>
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover"))
+
+
+## 6) Model-info row for NY-only yield summary --------------------------
+
+model_info_yield_ny <- tibble::tibble(
+  response_label    = "Bean yield (kg ha^-1, adjusted to 14% moisture), NY-only, model-predicted means*",
+  family_structure  = "Gaussian LMM (identity link)",
+  fixed_effects     = primary_model_name_yield_ny,
+  random_effects    = "(1 | site_year) + (1 | site_year:block) + (1 | site_year:block:weed_trt)",
+  AIC_additive      = round(AIC_add_yield_ny, 2),
+  AIC_interaction   = round(AIC_int_yield_ny, 2),
+  deltaAIC_add_int  = round(deltaAIC_yield_ny, 2),
+  LRT_p_int_raw     = p_int_yield_ny,
+  LRT_p_int_label   = dplyr::case_when(
+    p_int_yield_ny < 0.001 ~ "<0.001",
+    p_int_yield_ny < 0.01  ~ "<0.01",
+    TRUE                   ~ sprintf("%.3f", p_int_yield_ny)
+  ),
+  interaction_class = interaction_class_yield_ny
+)
+
+readr::write_csv(
+  model_info_yield_ny,
+  file.path(tab_dir_yield_ny, "tab_ny-bean-yield_model-info.csv")
+)
+
+
+## 7) Bundle all NY-only yield tables into one workbook -----------------
+
+if (requireNamespace("writexl", quietly = TRUE)) {
+  yield_tables_ny <- list(
+    Anova_pvals         = pvals_yield_ny,
+    SiteYear_means_CLD  = loc_summary_yield_ny,
+    Mowing_means_CLD    = trt_summary_yield_ny,
+    Weediness_means_CLD = weeds_summary_yield_ny,
+    SiteYear_trt_means  = int_summary_yield_ny,
+    Model_info          = model_info_yield_ny
+  )
+  
+  writexl::write_xlsx(
+    yield_tables_ny,
+    path = file.path(tab_dir_yield_ny, "NY-only_bean-yield_all-tables.xlsx")
+  )
+} else {
+  message("Package 'writexl' not installed; skipping NY-only yield Excel export.")
+}
+
+```
+
+# Figures
+###Ecobean
+```{r}
+## Ecobean bean yield (kg ha^-1, adjusted to 14% moisture): figures -----
+
+kg_ha_to_lb_ac <- 0.892179  # same conversion as biomass
+
+fig_dir_yield_eco <- here("analysis", "figs", "yield", "Ecobean")
+dir.create(fig_dir_yield_eco, showWarnings = FALSE, recursive = TRUE)
+
+# 1) MODEL-PREDICTED MEANS (kg ha^-1) -----------------------------------
+# uses trt_summary_yield_eco from the summary-tables chunk
+
+plot_df_yield_eco_model <- trt_summary_yield_eco |>
+  dplyr::mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    mean     = model_mean,
+    ymin     = pmax(mean - SE, 0),
+    ymax     = mean + SE
+  )
+
+fig_eco_yield_total_model_kg <- ggplot(
+  plot_df_yield_eco_model,
+  aes(x = weed_trt, y = mean, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
+    title   = "Ecobean: bean yield by mowing treatment",
+    caption = "Bars show LMM-predicted marginal means (kg ha\u207b\u00b9) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_eco_yield_total_model_kg
+
+ggsave(
+  filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_model_kg_ha.png"),
+  plot     = fig_eco_yield_total_model_kg,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 1a) MODEL-PREDICTED MEANS (lb ac^-1) ----------------------------------
+
+plot_df_yield_eco_model_lb <- plot_df_yield_eco_model |>
+  dplyr::mutate(
+    mean_lb = mean * kg_ha_to_lb_ac,
+    SE_lb   = SE   * kg_ha_to_lb_ac,
+    ymin_lb = pmax(mean_lb - SE_lb, 0),
+    ymax_lb = mean_lb + SE_lb
+  )
+
+fig_eco_yield_total_model_lb <- ggplot(
+  plot_df_yield_eco_model_lb,
+  aes(x = weed_trt, y = mean_lb, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_lb, ymax = ymax_lb), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*")"),
+    title   = "Ecobean: bean yield by mowing treatment",
+    caption = "Bars show LMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_eco_yield_total_model_lb
+
+ggsave(
+  filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_model_lb_ac.png"),
+  plot     = fig_eco_yield_total_model_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 2) RAW MEANS (kg ha^-1) ----------------------------------------------
+
+raw_eco_yield_fig <- bean_yield_eco |>
+  dplyr::group_by(weed_trt) |>
+  dplyr::summarise(
+    n    = dplyr::n(),
+    mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    sd   = stats::sd(yield_kg_ha_adj14, na.rm = TRUE),
+    se   = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    ymin     = pmax(mean - se, 0),
+    ymax     = mean + se
+  )
+
+fig_eco_yield_total_raw_kg <- ggplot(
+  raw_eco_yield_fig,
+  aes(x = weed_trt, y = mean, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
+    title   = "Ecobean: bean yield by mowing treatment",
+    caption = "Bars show raw treatment means (kg ha\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_eco_yield_total_raw_kg
+
+ggsave(
+  filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_raw_kg_ha.png"),
+  plot     = fig_eco_yield_total_raw_kg,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 3) RAW MEANS (lb ac^-1) ----------------------------------------------
+
+raw_eco_yield_fig_lb <- raw_eco_yield_fig |>
+  dplyr::mutate(
+    mean_lb = mean * kg_ha_to_lb_ac,
+    se_lb   = se   * kg_ha_to_lb_ac,
+    ymin_lb = pmax(mean_lb - se_lb, 0),
+    ymax_lb = mean_lb + se_lb
+  )
+
+fig_eco_yield_total_raw_lb <- ggplot(
+  raw_eco_yield_fig_lb,
+  aes(x = weed_trt, y = mean_lb, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_lb, ymax = ymax_lb), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*")"),
+    title   = "Ecobean: bean yield by mowing treatment",
+    caption = "Bars show raw treatment means (lb ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_eco_yield_total_raw_lb
+
+ggsave(
+  filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_raw_lb_ac.png"),
+  plot     = fig_eco_yield_total_raw_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+```
+###New York only
+
+```{r}
+## NY-only bean yield (kg ha^-1, adjusted to 14% moisture): figures -----
+
+kg_ha_to_lb_ac <- 0.892179  # same conversion
+
+fig_dir_yield_ny <- here("analysis", "figs", "yield", "NY-only")
+dir.create(fig_dir_yield_ny, showWarnings = FALSE, recursive = TRUE)
+
+# 1) MODEL-PREDICTED MEANS (kg ha^-1) -----------------------------------
+# uses trt_summary_yield_ny from the NY-only summary-tables chunk
+
+plot_df_yield_ny_model <- trt_summary_yield_ny |>
+  dplyr::mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    mean     = model_mean,
+    ymin     = pmax(mean - SE, 0),
+    ymax     = mean + SE
+  )
+
+fig_ny_yield_total_model_kg <- ggplot(
+  plot_df_yield_ny_model,
+  aes(x = weed_trt, y = mean, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
+    title   = "New York (Cornell + Farm Hub): bean yield by mowing treatment",
+    caption = "Bars show LMM-predicted marginal means (kg ha\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_yield_total_model_kg
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_model_kg_ha.png"),
+  plot     = fig_ny_yield_total_model_kg,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 1a) MODEL-PREDICTED MEANS (lb ac^-1) ----------------------------------
+
+plot_df_yield_ny_model_lb <- plot_df_yield_ny_model |>
+  dplyr::mutate(
+    mean_lb = mean * kg_ha_to_lb_ac,
+    SE_lb   = SE   * kg_ha_to_lb_ac,
+    ymin_lb = pmax(mean_lb - SE_lb, 0),
+    ymax_lb = mean_lb + SE_lb
+  )
+
+fig_ny_yield_total_model_lb <- ggplot(
+  plot_df_yield_ny_model_lb,
+  aes(x = weed_trt, y = mean_lb, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_lb, ymax = ymax_lb), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*")"),
+    title   = "New York (Cornell + Farm Hub): bean yield by mowing treatment",
+    caption = "Bars show LMM-predicted marginal means (lb ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_yield_total_model_lb
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_model_lb_ac.png"),
+  plot     = fig_ny_yield_total_model_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 2) RAW MEANS (kg ha^-1) ----------------------------------------------
+
+raw_ny_yield_fig <- bean_yield_ny |>
+  dplyr::group_by(weed_trt) |>
+  dplyr::summarise(
+    n    = dplyr::n(),
+    mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    sd   = stats::sd(yield_kg_ha_adj14, na.rm = TRUE),
+    se   = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    weed_trt = factor(weed_trt, levels = mow_levels),
+    ymin     = pmax(mean - se, 0),
+    ymax     = mean + se
+  )
+
+fig_ny_yield_total_raw_kg <- ggplot(
+  raw_ny_yield_fig,
+  aes(x = weed_trt, y = mean, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
+    title   = "New York (Cornell + Farm Hub): bean yield by mowing treatment",
+    caption = "Bars show raw treatment means (kg ha\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_yield_total_raw_kg
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_raw_kg_ha.png"),
+  plot     = fig_ny_yield_total_raw_kg,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 3) RAW MEANS (lb ac^-1) ----------------------------------------------
+
+raw_ny_yield_fig_lb <- raw_ny_yield_fig |>
+  dplyr::mutate(
+    mean_lb = mean * kg_ha_to_lb_ac,
+    se_lb   = se   * kg_ha_to_lb_ac,
+    ymin_lb = pmax(mean_lb - se_lb, 0),
+    ymax_lb = mean_lb + se_lb
+  )
+
+fig_ny_yield_total_raw_lb <- ggplot(
+  raw_ny_yield_fig_lb,
+  aes(x = weed_trt, y = mean_lb, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_lb, ymax = ymax_lb), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*")"),
+    title   = "New York (Cornell + Farm Hub): bean yield by mowing treatment",
+    caption = "Bars show raw treatment means (lb ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_yield_total_raw_lb
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_raw_lb_ac.png"),
+  plot     = fig_ny_yield_total_raw_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+```
+
+# Yield potential anaylsis
+## Ecobean
+###Data import
+```{r}
+#Yield potential analysis
+## Ecobean system-level yield dataset (includes weed-free) --------------
+
+bean_yield_sys_eco <- imt_yield_clean |>
+  # Ecobean = all 5 IMT locations
+  dplyr::filter(location %in% c("CU", "FH", "ME", "VT", "WI")) |>
+  
+  # 1) 3-level weed-status factor (ambient, surrogate, weed-free)
+  dplyr::mutate(
+    weeds3 = dplyr::recode(
+      microplot,
+      "M"  = "Ambient weeds",
+      "SW" = "Surrogate weeds",
+      "WF" = "Weed-free",
+      .default = NA_character_
+    ),
+    weeds3 = factor(
+      weeds3,
+      levels = c("Ambient weeds", "Surrogate weeds", "Weed-free")
+    )
+  ) |>
+  
+  # 2) System-level factor (only combinations that actually exist)
+  dplyr::mutate(
+    system_trt = dplyr::case_when(
+      weeds3 == "Weed-free" ~ "No mowing, weed-free",
+      
+      weed_trt == "No mowing"    & weeds3 == "Ambient weeds"   ~ "No mowing, ambient weeds",
+      weed_trt == "Early mowing" & weeds3 == "Ambient weeds"   ~ "Early mowing, ambient weeds",
+      weed_trt == "Late mowing"  & weeds3 == "Ambient weeds"   ~ "Late mowing, ambient weeds",
+      weed_trt == "As-needed mowing" & weeds3 == "Ambient weeds" ~ "As-needed mowing, ambient weeds",
+      
+      weed_trt == "No mowing"    & weeds3 == "Surrogate weeds" ~ "No mowing, surrogate weeds",
+      weed_trt == "Early mowing" & weeds3 == "Surrogate weeds" ~ "Early mowing, surrogate weeds",
+      weed_trt == "Late mowing"  & weeds3 == "Surrogate weeds" ~ "Late mowing, surrogate weeds",
+      weed_trt == "As-needed mowing" & weeds3 == "Surrogate weeds" ~ "As-needed mowing, surrogate weeds",
+      
+      TRUE ~ NA_character_
+    )
+  ) |>
+  dplyr::filter(!is.na(system_trt)) |>
+  dplyr::mutate(
+    system_trt = factor(
+      system_trt,
+      levels = c(
+        # ambient systems
+        "No mowing, ambient weeds",
+        "Early mowing, ambient weeds",
+        "Late mowing, ambient weeds",
+        "As-needed mowing, ambient weeds",
+        # surrogate systems
+        "No mowing, surrogate weeds",
+        "Early mowing, surrogate weeds",
+        "Late mowing, surrogate weeds",
+        "As-needed mowing, surrogate weeds",
+        # weed-free potential
+        "No mowing, weed-free"
+      )
+    )
+  )
+
+# Quick check
+bean_yield_sys_eco |>
+  dplyr::count(system_trt) |>
+  kableExtra::kable(
+    caption = "Ecobean system-level sample sizes (including weed-free)"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+# 9-color TinyPerfectThings palette for system_trt ---------------------
+sys_levels <- levels(bean_yield_sys_eco$system_trt)
+
+fill_cols_sys <- WB_brewer(
+  name = "LittleBlueHouseBesideTheSea1",
+  n    = length(sys_levels),
+  type = "discrete"
+) |>
+  setNames(sys_levels)
+
+```
+
+### Model selection
+```{r}
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Simpler system-level model
+yield_sys_eco_lmm <- lmer(
+  yield_kg_ha_adj14 ~ system_trt + (1 | site_year/block),
+  data = bean_yield_sys_eco
+)
+
+# Diagnostics (sanity check)
+set.seed(123)
+res_sys_eco <- DHARMa::simulateResiduals(yield_sys_eco_lmm)
+plot(res_sys_eco)
+DHARMa::testDispersion(yield_sys_eco_lmm)
+
+# zero-inflation test isn't really meaningful for Gaussian,
+# but you *can* run it if you want to be parallel:
+DHARMa::testZeroInflation(yield_sys_eco_lmm)
+
+# Type-III tests
+anova_yield_sys_eco <- car::Anova(yield_sys_eco_lmm, type = 3)
+anova_yield_sys_eco
+
+```
+
+###Summary Table
+```{r}
+## Emmeans & CLDs for system_trt ----------------------------------------
+
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# 1) Emmeans for system_trt (Gaussian LMM: emmean is already on response scale)
+emm_sys_eco <- emmeans(
+  yield_sys_eco_lmm,
+  ~ system_trt
+)
+
+# 2) Tidy emmeans, standardize CI column names, and set factor levels ----
+emm_sys_eco_tmp <- tidy_emm(
+  emm_sys_eco,
+  trt_var    = "system_trt",
+  ref_levels = levels(bean_yield_sys_eco$system_trt)
+)
+
+emm_sys_eco_df <- emm_sys_eco_tmp |>
+  dplyr::mutate(
+    system_trt = factor(system_trt,
+                        levels = levels(bean_yield_sys_eco$system_trt)),
+    # For Gaussian LMMs, emmean is the predicted mean on the data scale
+    model_mean = emmean
+  ) |>
+  dplyr::select(system_trt, model_mean, SE, ci_low, ci_high)
+
+# 3) CLDs for system_trt ------------------------------------------------
+cld_sys_eco <- multcomp::cld(
+  emm_sys_eco,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE  # "a" = highest yield group
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    system_trt = factor(system_trt,
+                        levels = levels(bean_yield_sys_eco$system_trt)),
+    sys_CLD    = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(system_trt, sys_CLD)
+
+# 4) Join and round -----------------------------------------------------
+sys_summary_yield_eco <- emm_sys_eco_df |>
+  dplyr::left_join(cld_sys_eco, by = "system_trt") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    SE         = round(SE, 1),
+    ci_low     = round(ci_low, 1),
+    ci_high    = round(ci_high, 1)
+  )
+
+sys_summary_yield_eco |>
+  kableExtra::kable(
+    caption = "Ecobean bean yield (kg ha⁻¹, 14% moisture): system-level means (including weed-free)"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+
+```
+
+### Figure
+```{r}
+# Conversion factor ------------------------------------------------------
+kg_ha_to_lb_ac <- 0.892179
+
+# Helper: break after comma for multi-line x-axis labels ----------------
+label_break_comma_tight <- function(x) {
+  stringr::str_replace_all(x, ", ", "\n")
+}
+
+# Figure directory (same as before) -------------------------------------
+fig_dir_yield_sys_eco <- here("analysis", "figs", "yield", "Ecobean", "systems")
+dir.create(fig_dir_yield_sys_eco, showWarnings = FALSE, recursive = TRUE)
+
+# Order systems: weed-free first, then ambient, then surrogate ----------
+sys_levels <- c(
+  "No mowing, weed-free",
+  "No mowing, ambient weeds",
+  "Early mowing, ambient weeds",
+  "Late mowing, ambient weeds",
+  "As-needed mowing, ambient weeds",
+  "No mowing, surrogate weeds",
+  "Early mowing, surrogate weeds",
+  "Late mowing, surrogate weeds",
+  "As-needed mowing, surrogate weeds"
+)
+
+# Base plotting dataframe in kg ha^-1 (model-based) ---------------------
+plot_sys_df <- sys_summary_yield_eco |>
+  dplyr::mutate(
+    system_trt = factor(system_trt, levels = sys_levels),
+    # derive the base mowing treatment from the text before the comma
+    base_mow   = stringr::str_remove(system_trt, ",.*"),
+    base_mow   = factor(base_mow, levels = mow_levels),
+    ymin       = pmax(model_mean - SE, 0),
+    ymax       = model_mean + SE
+  )
+
+# 1) MODEL-PREDICTED MEANS (kg ha^-1) -----------------------------------
+fig_sys_yield_eco <- ggplot(
+  plot_sys_df,
+  aes(x = system_trt, y = model_mean, fill = system_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(
+    aes(ymin = ymin, ymax = ymax),
+    width = 0.14
+  ) +
+  geom_text(
+    aes(y = ymax * 1.06, label = sys_CLD),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 4
+  ) +
+  scale_fill_manual(values = fill_cols_sys, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_tight) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*", 14% moisture)"),
+    title   = "Ecobean: system-level bean yield including weed-free",
+    caption = "Bars show LMM-predicted marginal means (kg ha\u207b\u00b9, 14% moisture) \u00b1 SE; letters indicate Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text.x  = element_text(size = 9.5, lineheight = 0.9, margin = margin(t = 6)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_sys_yield_eco
+
+ggsave(
+  filename = file.path(
+    fig_dir_yield_sys_eco,
+    "fig_ecobean_yield_systems_model_kg_ha.png"
+  ),
+  plot   = fig_sys_yield_eco,
+  width  = 12,      # widened to help labels fit
+  height = 5.5,
+  dpi    = 300
+)
+
+# 2) MODEL-PREDICTED MEANS (lb ac^-1) – EXTENSION FIGURE ---------------
+
+plot_sys_df_lb <- plot_sys_df |>
+  dplyr::mutate(
+    mean_lb = model_mean * kg_ha_to_lb_ac,
+    SE_lb   = SE         * kg_ha_to_lb_ac,
+    ymin_lb = pmax(mean_lb - SE_lb, 0),
+    ymax_lb = mean_lb + SE_lb
+  )
+
+fig_sys_yield_eco_lb <- ggplot(
+  plot_sys_df_lb,
+  aes(x = system_trt, y = mean_lb, fill = system_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(
+    aes(ymin = ymin_lb, ymax = ymax_lb),
+    width = 0.14
+  ) +
+  geom_text(
+    aes(y = ymax_lb * 1.06, label = sys_CLD),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 4
+  ) +
+  scale_fill_manual(values = fill_cols_sys, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_tight) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*", 14% moisture)"),
+    title   = "Ecobean: system-level bean yield including weed-free",
+    caption = "Bars show LMM-predicted marginal means (lb ac\u207b\u00b9, 14% moisture) \u00b1 SE; letters indicate Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text.x  = element_text(size = 9.5, lineheight = 0.9, margin = margin(t = 6)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_sys_yield_eco_lb
+
+ggsave(
+  filename = file.path(
+    fig_dir_yield_sys_eco,
+    "fig_ecobean_yield_systems_model_lb_ac.png"
+  ),
+  plot   = fig_sys_yield_eco_lb,
+  width  = 12,
+  height = 5.5,
+  dpi    = 300
+)
+
+
+```
+
+## New York Only
+###Data import
+```{r}
+## NY-only system-level yield dataset (includes weed-free) --------------
+
+bean_yield_sys_ny <- imt_yield_clean |>
+  # New York only = Cornell + Farm Hub
+  dplyr::filter(location %in% c("CU", "FH")) |>
+  
+  # 1) 3-level weed-status factor (ambient, surrogate, weed-free)
+  dplyr::mutate(
+    weeds3 = dplyr::recode(
+      microplot,
+      "M"  = "Ambient weeds",
+      "SW" = "Surrogate weeds",
+      "WF" = "Weed-free",
+      .default = NA_character_
+    ),
+    weeds3 = factor(
+      weeds3,
+      levels = c("Ambient weeds", "Surrogate weeds", "Weed-free")
+    )
+  ) |>
+  
+  # 2) System-level factor (only combinations that actually exist)
+  dplyr::mutate(
+    system_trt = dplyr::case_when(
+      # Weed-free: only in no-mowing plots
+      weeds3 == "Weed-free" ~ "No mowing, weed-free",
+      
+      weed_trt == "No mowing"        & weeds3 == "Ambient weeds"   ~ "No mowing, ambient weeds",
+      weed_trt == "Early mowing"     & weeds3 == "Ambient weeds"   ~ "Early mowing, ambient weeds",
+      weed_trt == "Late mowing"      & weeds3 == "Ambient weeds"   ~ "Late mowing, ambient weeds",
+      weed_trt == "As-needed mowing" & weeds3 == "Ambient weeds"   ~ "As-needed mowing, ambient weeds",
+      
+      weed_trt == "No mowing"        & weeds3 == "Surrogate weeds" ~ "No mowing, surrogate weeds",
+      weed_trt == "Early mowing"     & weeds3 == "Surrogate weeds" ~ "Early mowing, surrogate weeds",
+      weed_trt == "Late mowing"      & weeds3 == "Surrogate weeds" ~ "Late mowing, surrogate weeds",
+      weed_trt == "As-needed mowing" & weeds3 == "Surrogate weeds" ~ "As-needed mowing, surrogate weeds",
+      
+      TRUE ~ NA_character_
+    )
+  ) |>
+  dplyr::filter(!is.na(system_trt)) |>
+  dplyr::mutate(
+    system_trt = factor(
+      system_trt,
+      levels = c(
+        # ambient systems
+        "No mowing, ambient weeds",
+        "Early mowing, ambient weeds",
+        "Late mowing, ambient weeds",
+        "As-needed mowing, ambient weeds",
+        # surrogate systems
+        "No mowing, surrogate weeds",
+        "Early mowing, surrogate weeds",
+        "Late mowing, surrogate weeds",
+        "As-needed mowing, surrogate weeds",
+        # weed-free potential
+        "No mowing, weed-free"
+      )
+    )
+  )
+
+# Quick check: NY-only sample sizes by system ---------------------------
+bean_yield_sys_ny |>
+  dplyr::count(system_trt) |>
+  kableExtra::kable(
+    caption = "NY-only system-level sample sizes (including weed-free)"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+# 9-color TinyPerfectThings palette for NY-only system_trt -------------
+sys_levels_ny <- levels(droplevels(bean_yield_sys_ny$system_trt))
+
+fill_cols_sys_ny <- WB_brewer(
+  name = "LittleBlueHouseBesideTheSea1",
+  n    = length(sys_levels_ny),
+  type = "discrete"
+) |>
+  setNames(sys_levels_ny)
+
+```
+
+### Model selection
+
+```{r}
+options(contrasts = c("contr.sum", "contr.poly"))
+
+## NY-only system-level yield model ------------------------------------
+
+yield_sys_ny_lmm <- lmer(
+  yield_kg_ha_adj14 ~ system_trt + (1 | site_year/block),
+  data = bean_yield_sys_ny
+)
+
+# Diagnostics
+set.seed(123)
+res_sys_ny <- DHARMa::simulateResiduals(yield_sys_ny_lmm)
+plot(res_sys_ny)
+DHARMa::testDispersion(yield_sys_ny_lmm)
+DHARMa::testZeroInflation(yield_sys_ny_lmm)
+
+# Type-III tests
+anova_yield_sys_ny <- car::Anova(yield_sys_ny_lmm, type = 3)
+anova_yield_sys_ny
+
+```
+###Summary
+```{r}
+## NY-only: Emmeans & CLDs for system_trt --------------------------------
+
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# 1) Emmeans for system_trt (Gaussian LMM: emmean is on response scale)
+emm_sys_ny <- emmeans(
+  yield_sys_ny_lmm,
+  ~ system_trt
+)
+
+# 2) Tidy emmeans, standardize CI column names, and set factor levels ----
+emm_sys_ny_tmp <- tidy_emm(
+  emm_sys_ny,
+  trt_var    = "system_trt",
+  ref_levels = levels(bean_yield_sys_ny$system_trt)
+)
+
+emm_sys_ny_df <- emm_sys_ny_tmp |>
+  dplyr::mutate(
+    system_trt = factor(
+      system_trt,
+      levels = levels(bean_yield_sys_ny$system_trt)
+    ),
+    # For Gaussian LMMs, emmean is the predicted mean on the data scale
+    model_mean = emmean
+  ) |>
+  dplyr::select(system_trt, model_mean, SE, ci_low, ci_high)
+
+# 3) CLDs for system_trt -------------------------------------------------
+cld_sys_ny <- multcomp::cld(
+  emm_sys_ny,
+  adjust   = "none",
+  Letters  = letters,
+  sort     = TRUE,
+  reversed = TRUE  # "a" = highest yield group
+) |>
+  as_tibble() |>
+  dplyr::mutate(
+    system_trt = factor(
+      system_trt,
+      levels = levels(bean_yield_sys_ny$system_trt)
+    ),
+    sys_CLD = stringr::str_trim(.group)
+  ) |>
+  dplyr::select(system_trt, sys_CLD)
+
+# 4) Join and round -----------------------------------------------------
+sys_summary_yield_ny <- emm_sys_ny_df |>
+  dplyr::left_join(cld_sys_ny, by = "system_trt") |>
+  dplyr::mutate(
+    model_mean = round(model_mean, 1),
+    SE         = round(SE, 1),
+    ci_low     = round(ci_low, 1),
+    ci_high    = round(ci_high, 1)
+  )
+
+sys_summary_yield_ny |>
+  kableExtra::kable(
+    caption = "NY-only bean yield (kg ha⁻¹, 14% moisture): system-level means (including weed-free)"
+  ) |>
+  kableExtra::kable_styling(full_width = FALSE)
+
+```
+
+### Figure
+```{r}
+## NY-only: raw system-level means figure for HVFH ----------------------
+
+# Start from your NY-only system dataset (already defined earlier)
+# bean_yield_sys_ny has: yield_kg_ha_adj14, system_trt, etc.
+
+kg_ha_to_lb_ac <- 0.892179
+
+# Order: weed-free first, then ambient, then surrogate
+sys_levels_ny <- c(
+  "No mowing, weed-free",
+  "No mowing, ambient weeds",
+  "Early mowing, ambient weeds",
+  "Late mowing, ambient weeds",
+  "As-needed mowing, ambient weeds",
+  "No mowing, surrogate weeds",
+  "Early mowing, surrogate weeds",
+  "Late mowing, surrogate weeds",
+  "As-needed mowing, surrogate weeds"
+)
+
+# Raw summary (kg ha^-1)
+ny_sys_raw <- bean_yield_sys_ny |>
+  dplyr::group_by(system_trt) |>
+  dplyr::summarise(
+    n    = dplyr::n(),
+    mean = mean(yield_kg_ha_adj14, na.rm = TRUE),
+    sd   = stats::sd(yield_kg_ha_adj14, na.rm = TRUE),
+    se   = sd / sqrt(n),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    system_trt = factor(system_trt, levels = sys_levels_ny),
+    ymin       = pmax(mean - se, 0),
+    ymax       = mean + se
+  ) |>
+  # optional: join CLDs from the LMM if you want letters on the raw bars
+  dplyr::left_join(sys_summary_yield_ny |> 
+                     dplyr::select(system_trt, sys_CLD),
+                   by = "system_trt")
+
+# Figure directory for NY-only HVFH report
+fig_dir_yield_sys_ny <- here("analysis", "figs", "yield", "NY-only", "systems")
+dir.create(fig_dir_yield_sys_ny, showWarnings = FALSE, recursive = TRUE)
+
+# Raw means (kg ha^-1)
+fig_sys_yield_ny_raw_kg <- ggplot(
+  ny_sys_raw,
+  aes(x = system_trt, y = mean, fill = system_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), width = 0.14) +
+  geom_text(
+    aes(y = ymax * 1.06, label = sys_CLD),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 4
+  ) +
+  scale_fill_manual(values = fill_cols_sys_ny, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_tight) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*", 14% moisture)"),
+    title   = "NY-only: system-level bean yield including weed-free",
+    caption = "Bars show raw treatment means (kg ha\u207b\u00b9, 14% moisture) \u00b1 SE; letters reuse LMM-based Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text.x  = element_text(size = 9.5, lineheight = 0.9, margin = margin(t = 6)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_sys_yield_ny_raw_kg
+
+ggsave(
+  filename = file.path(
+    fig_dir_yield_sys_ny,
+    "fig_ny_yield_systems_raw_kg_ha.png"
+  ),
+  plot   = fig_sys_yield_ny_raw_kg,
+  width  = 12,
+  height = 5.5,
+  dpi    = 300
+)
+
+# Raw means (lb ac^-1) for extension
+ny_sys_raw_lb <- ny_sys_raw |>
+  dplyr::mutate(
+    mean_lb = mean * kg_ha_to_lb_ac,
+    se_lb   = se   * kg_ha_to_lb_ac,
+    ymin_lb = pmax(mean_lb - se_lb, 0),
+    ymax_lb = mean_lb + se_lb
+  )
+
+fig_sys_yield_ny_raw_lb <- ggplot(
+  ny_sys_raw_lb,
+  aes(x = system_trt, y = mean_lb, fill = system_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_lb, ymax = ymax_lb), width = 0.14) +
+  geom_text(
+    aes(y = ymax_lb * 1.06, label = sys_CLD),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 4
+  ) +
+  scale_fill_manual(values = fill_cols_sys_ny, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_tight) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*", 14% moisture)"),
+    title   = "NY-only: system-level bean yield including weed-free",
+    caption = "Bars show raw treatment means (lb ac\u207b\u00b9, 14% moisture) \u00b1 SE; letters reuse LMM-based Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+  ) +
+  theme_classic(base_size = 16) +
+  theme(
+    axis.text.x  = element_text(size = 9.5, lineheight = 0.9, margin = margin(t = 6)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_sys_yield_ny_raw_lb
+
+ggsave(
+  filename = file.path(
+    fig_dir_yield_sys_ny,
+    "fig_ny_yield_systems_raw_lb_ac.png"
+  ),
+  plot   = fig_sys_yield_ny_raw_lb,
+  width  = 12,
+  height = 5.5,
+  dpi    = 300
+)
+
+```
+
+## last chunk
+
 ```{r}
 ## Equivalence testing
 ### Are mowing treatments "close enough" to the no-mowing control?
