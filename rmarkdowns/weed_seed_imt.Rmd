@@ -8,7 +8,7 @@ always_allow_html: true
 
 
 ---
-#Setup
+# Setup
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo    = TRUE,
@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 
 )
 ```
-#Packages
+# Packages
 
 ```{r}
 # Packages ------------------------------------------------------------
@@ -226,8 +226,8 @@ seed_plot_totals_ny |>
   kable_styling(full_width = FALSE)
 
 ```
-#Model testing
-#Exploratory
+# Model testing
+# Exploratory
 
 ```{r}
 
@@ -523,7 +523,7 @@ car::Anova(seed_glmm_ny, type = 3)
 
 ```
 # Summary tables
-###Ecobean
+## Ecobean
 
 ```{r}
 ## Ecobean: weed seed rain (seeds m^-2 season^-1) summary tables ---------
@@ -1138,7 +1138,7 @@ if (requireNamespace("writexl", quietly = TRUE)) {
 
 ```
 # Figures
-###Ecobean
+## Ecobean
 
 ```{r}
 ## Ecobean weed seeds: figures (m^-2 and ft^-2; model + raw; with CLDs) --
@@ -1366,7 +1366,7 @@ ggsave(
 )
 
 ```
-### Ny-only
+## Ny-only
 
 ```{r}
 ## NY-only weed seeds: figures (m^-2 and ft^-2; model + raw; with CLDs) --
@@ -1579,3 +1579,9 @@ ggsave(
 )
 
 ```
+```{r}
+# NOTE (future pub): consider modeling seeds_total with offset(log(area_sampled_m2))
+# and NB2 as a sensitivity analysis; current approach uses Tweedie on density.
+
+```
+
