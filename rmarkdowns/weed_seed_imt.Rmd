@@ -1177,8 +1177,8 @@ fig_eco_seed_model_m2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~m^{-2}*")"),
-    title   = "Ecobean: weed seed rain by mowing treatment",
-    caption = "Bars show Tweedie GLMM-predicted marginal means (seeds m\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
+    title   = "Weed seed rain by mowing treatment",
+    #caption = "Bars show Tweedie GLMM-predicted marginal means (seeds m\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1223,8 +1223,8 @@ fig_eco_seed_model_ft2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = "Ecobean: weed seed rain by mowing treatment",
-    caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
+    title   = "Weed seed rain by mowing treatment",
+    #caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1298,8 +1298,8 @@ fig_eco_seed_raw_m2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~m^{-2}*")"),
-    title   = "Ecobean: weed seed rain by mowing treatment",
-    caption = "Bars show raw treatment means (seeds m\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
+    title   = "Weed seed rain by mowing treatment",
+    #caption = "Bars show raw treatment means (seeds m\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1344,8 +1344,8 @@ fig_eco_seed_raw_ft2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = "Ecobean: weed seed rain by mowing treatment",
-    caption = "Bars show raw treatment means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
+    title   = "Weed seed rain by mowing treatment",
+    #caption = "Bars show raw treatment means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1404,7 +1404,7 @@ fig_ny_seed_total_model_m2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~m^{-2}*")"),
-    title   = "New York (Cornell + Farm Hub): weed seed rain by mowing treatment",
+    title   = "Weed seed rain by mowing treatment",
     caption = "Bars show Tweedie GLMM-predicted marginal means (seeds m\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -1449,7 +1449,7 @@ fig_ny_seed_total_model_ft2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = "New York (Cornell + Farm Hub): weed seed rain by mowing treatment",
+    title   = "Weed seed rain by mowing treatment",
     caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -1511,7 +1511,7 @@ fig_ny_seed_total_raw_m2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~m^{-2}*")"),
-    title   = "New York (Cornell + Farm Hub): weed seed rain by mowing treatment",
+    title   = "Weed seed rain by mowing treatment",
     caption = "Bars show raw treatment means (seeds m\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings from the Tweedie GLMM (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -1557,7 +1557,7 @@ fig_ny_seed_total_raw_ft2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = "New York (Cornell + Farm Hub): weed seed rain by mowing treatment",
+    title   = "Weed seed rain by mowing treatment",
     caption = "Bars show raw treatment means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings from the Tweedie GLMM (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
