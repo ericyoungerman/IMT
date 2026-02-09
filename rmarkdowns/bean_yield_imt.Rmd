@@ -1545,7 +1545,9 @@ if (requireNamespace("writexl", quietly = TRUE)) {
 ```{r}
 ## Ecobean bean yield (kg ha^-1, adjusted to 14% moisture): figures -----
 
-kg_ha_to_lb_ac <- 0.892179  # same conversion as biomass
+kg_ha_to_lb_ac  <- 0.892179              # same conversion as biomass
+kg_ha_to_bu_ac  <- kg_ha_to_lb_ac / 60   # assuming 60 lb per bushel
+# equivalently: 1 kg/ha ≈ 0.01487 bu/ac
 
 fig_dir_yield_eco <- here("analysis", "figs", "yield", "Ecobean")
 dir.create(fig_dir_yield_eco, showWarnings = FALSE, recursive = TRUE)
@@ -1572,9 +1574,8 @@ fig_eco_yield_total_model_kg <- ggplot(
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x       = NULL,
-    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
-    title   = "Ecobean: bean yield by mowing treatment",
-    caption = "Bars show LMM-predicted marginal means (kg ha\u207b\u00b9) \u00b1 SE."
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*" at 14% moisture)"),
+    title   = "Bean yield by mowing treatment"
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1616,9 +1617,8 @@ fig_eco_yield_total_model_lb <- ggplot(
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x       = NULL,
-    y       = expression(Bean~yield~"(lb"~ac^{-1}*")"),
-    title   = "Ecobean: bean yield by mowing treatment",
-    caption = "Bars show LMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE."
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*" at 14% moisture)"),
+    title   = "Bean yield by mowing treatment"
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1633,6 +1633,49 @@ fig_eco_yield_total_model_lb
 ggsave(
   filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_model_lb_ac.png"),
   plot     = fig_eco_yield_total_model_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 1b) MODEL-PREDICTED MEANS (bu ac^-1) ----------------------------------
+
+plot_df_yield_eco_model_bu <- plot_df_yield_eco_model |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    SE_bu   = SE   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - SE_bu, 0),
+    ymax_bu = mean_bu + SE_bu
+  )
+
+fig_eco_yield_total_model_bu <- ggplot(
+  plot_df_yield_eco_model_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(bu"~ac^{-1}*" at 14% moisture)"),
+    title   = "Bean yield by mowing treatment"
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_eco_yield_total_model_bu
+
+ggsave(
+  filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_model_bu_ac.png"),
+  plot     = fig_eco_yield_total_model_bu,
   width    = 9,
   height   = 5.5,
   dpi      = 300
@@ -1667,8 +1710,8 @@ fig_eco_yield_total_raw_kg <- ggplot(
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x       = NULL,
-    y       = expression(Bean~yield~"(kg"~ha^{-1}*")"),
-    title   = "Ecobean: bean yield by mowing treatment",
+    y       = expression(Bean~yield~"(kg"~ha^{-1}*" at 14% moisture)"),
+    title   = "Bean yield by mowing treatment",
     caption = "Bars show raw treatment means (kg ha\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
   ) +
   theme_classic(base_size = 18) +
@@ -1711,8 +1754,8 @@ fig_eco_yield_total_raw_lb <- ggplot(
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x       = NULL,
-    y       = expression(Bean~yield~"(lb"~ac^{-1}*")"),
-    title   = "Ecobean: bean yield by mowing treatment",
+    y       = expression(Bean~yield~"(lb"~ac^{-1}*" at 14% moisture)"),
+    title   = "Bean yield by mowing treatment",
     caption = "Bars show raw treatment means (lb ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
   ) +
   theme_classic(base_size = 18) +
@@ -1728,6 +1771,50 @@ fig_eco_yield_total_raw_lb
 ggsave(
   filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_raw_lb_ac.png"),
   plot     = fig_eco_yield_total_raw_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+# 3b) RAW MEANS (bu ac^-1) ---------------------------------------------
+
+raw_eco_yield_fig_bu <- raw_eco_yield_fig |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    se_bu   = se   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - se_bu, 0),
+    ymax_bu = mean_bu + se_bu
+  )
+
+fig_eco_yield_total_raw_bu <- ggplot(
+  raw_eco_yield_fig_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(bu"~ac^{-1}*" at 14% moisture)"),
+    title   = "Bean yield by mowing treatment",
+    caption = "Bars show raw treatment means (bu ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_eco_yield_total_raw_bu
+
+ggsave(
+  filename = file.path(fig_dir_yield_eco, "fig_eco_yield_total_raw_bu_ac.png"),
+  plot     = fig_eco_yield_total_raw_bu,
   width    = 9,
   height   = 5.5,
   dpi      = 300

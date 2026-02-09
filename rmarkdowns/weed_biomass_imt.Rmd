@@ -55,7 +55,7 @@ mow_levels <- c(
 
 # One consistent CVD-safe color palette for all figures ---------------
 fill_cols <- WB_brewer(
-  name = "BlueberriesForSal",
+  name = "LittleBlueHouseBesideTheSea1",
   n    = length(mow_levels),
   type = "discrete"
 ) |>
@@ -228,7 +228,7 @@ weed_biomass_clean |>
 ```
 
 
-
+## Subsets
 ```{r}
 
 # Subset for weed biomass models: ambient vs surrogate only ---------
@@ -4349,8 +4349,8 @@ fig_eco_wbm_total_model <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(kg"~ha^{-1}*")"),
-    title   = "Ecobean: total weed biomass by mowing ",
-    caption = "Bars show GLMM-predicted marginal means (kg ha\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+    title   = "Total weed biomass by mowing ",
+    #caption = "Bars show GLMM-predicted marginal means (kg ha\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -4399,8 +4399,8 @@ fig_eco_wbm_total_model_lb <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(lb"~ac^{-1}*")"),
-    title   = "Ecobean: total weed biomass by mowing ",
-    caption = "Bars show GLMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+    title   = "Total weed biomass by mowing ",
+    #caption = "Bars show GLMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -4457,7 +4457,7 @@ fig_eco_wbm_total_raw_kg <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(kg"~ha^{-1}*")"),
-    title   = "Ecobean: total weed biomass by mowing )",
+    title   = "Total weed biomass by mowing )",
     caption = "Bars show raw treatment means (kg ha\u207b\u00b9) \u00b1 SE; letters reuse GLMM-based Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -4507,7 +4507,7 @@ fig_eco_wbm_total_raw_lb <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(lb"~ac^{-1}*")"),
-    title   = "Ecobean: total weed biomass by mowing",
+    title   = "Total weed biomass by mowing",
     caption = "Bars show raw treatment means (lb ac\u207b\u00b9) \u00b1 SE; letters reuse GLMM-based Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
