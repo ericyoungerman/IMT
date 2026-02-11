@@ -1153,6 +1153,97 @@ car::Anova(weed_glmm_ny, type = 3)
 ```
 
 ```{r}
+## Sanity check: does the weed_trt × weeds interaction matter? -----------
+
+# 1) Fit additive + interaction models in the *same* family/ZI/disp -----
+# (assumes ny_best is your chosen family/ZI/disp model from above)
+
+wbm_ny_int <- ny_best  # weed_trt * weeds + site_year + random effects
+wbm_ny_add <- update(wbm_ny_int, . ~ weed_trt + weeds + site_year)
+
+# 2) LRT (nested model comparison) --------------------------------------
+lrt_ny <- anova(wbm_ny_add, wbm_ny_int)
+print(lrt_ny)
+
+# 3) AIC check ----------------------------------------------------------
+AIC_add <- AIC(wbm_ny_add)
+AIC_int <- AIC(wbm_ny_int)
+cat("\nAIC(add) =", AIC_add,
+    "\nAIC(int) =", AIC_int,
+    "\nΔAIC (add - int) =", AIC_add - AIC_int, "\n")
+
+# 4) Wald test for the interaction term --------------------------------
+# Note: glmmTMB doesn't always give Type III interaction p-values directly.
+# This gives a joint Wald test for the interaction block.
+car::Anova(wbm_ny_int, type = 3)
+
+lme4::nobars(formula(wbm_ny_add))  # fixed
+lme4::findbars(formula(wbm_ny_add))# random
+lme4::findbars(formula(wbm_ny_int))
+```
+
+
+```{r}
+## Inspect interaction patterns (sensitivity) ----------------------------
+
+# 1) EMMs by weed_trt within weeds level (interaction model) -------------
+emm_int <- emmeans::emmeans(
+  wbm_ny_int,
+  ~ weed_trt | weeds,
+  type = "response"
+)
+
+# Get CIs explicitly (GLMMs often return asymp.LCL / asymp.UCL)
+emm_int_ci <- summary(emm_int, infer = c(TRUE, TRUE))
+emm_int_df <- as.data.frame(emm_int_ci)
+
+print(emm_int_df)
+
+# 2) Pairwise within each weeds level (LSD-style: no multiplicity adj) ---
+pairs_int <- emmeans::contrast(
+  emm_int,
+  method = "pairwise",
+  by = "weeds",
+  adjust = "none"
+)
+print(as.data.frame(pairs_int))
+
+# 3) Simple interaction plot (model-predicted means + CI bars) ----------
+# Uses asymp.LCL/asymp.UCL when present; falls back to SE if not.
+has_ci <- all(c("asymp.LCL", "asymp.UCL") %in% names(emm_int_df))
+
+p_int_plot <- ggplot(emm_int_df, aes(x = weed_trt, y = response, group = weeds)) +
+  geom_point(position = position_dodge(width = 0.2)) +
+  geom_line(position = position_dodge(width = 0.2)) +
+  facet_wrap(~ weeds) +
+  theme_classic(base_size = 14) +
+  labs(x = NULL, y = "Predicted weed biomass (kg ha^-1)")
+
+if (has_ci) {
+  p_int_plot <- p_int_plot +
+    geom_errorbar(
+      aes(ymin = asymp.LCL, ymax = asymp.UCL),
+      width = 0.12,
+      position = position_dodge(width = 0.2)
+    )
+} else {
+  p_int_plot <- p_int_plot +
+    geom_errorbar(
+      aes(ymin = pmax(response - SE, 0), ymax = response + SE),
+      width = 0.12,
+      position = position_dodge(width = 0.2)
+    )
+}
+
+p_int_plot
+
+emm_add_by_weeds <- emmeans::emmeans(wbm_ny_add, ~ weed_trt | weeds, type = "response")
+summary(emm_add_by_weeds)
+pairs(emm_add_by_weeds, by = "weeds", adjust = "none")
+```
+
+
+```{r}
 ## Model testing / selection for New York weed biomass (kg ha^-1) -------
 
 options(contrasts = c("contr.sum", "contr.poly"))
@@ -4739,16 +4830,21 @@ ggsave(
 
 ### New York only
 ```{r}
-## New York ONLY (Cornell + Farm Hub): TOTAL weed biomass figures -------
+### New York ONLY (Cornell + Farm Hub): TOTAL weed biomass figures -------
 
-kg_ha_to_lb_ac <- 0.892179
+# Conversions -----------------------------------------------------------
+kg_ha_to_lb_ac    <- 0.892179
+lb_per_bu_beans   <- 60                 # dry beans: 60 lb per bushel
+kg_ha_to_bu_ac    <- kg_ha_to_lb_ac / lb_per_bu_beans  # kg/ha -> bu/ac
 
+# Figure directory ------------------------------------------------------
 fig_dir_ny_total <- here("analysis", "figs", "weed-biomass", "NY-only", "total")
 dir.create(fig_dir_ny_total, showWarnings = FALSE, recursive = TRUE)
 
-# 1) MODEL-PREDICTED MEANS (kg ha^-1) ----------------------------------
-
-# uses emm_trt_wbm_ny_df and cld_wbm_ny from the NY summary chunk
+# ----------------------------------------------------------------------
+# 1) MODEL-PREDICTED MEANS (kg ha^-1)
+# ----------------------------------------------------------------------
+# Uses: emm_trt_wbm_ny_df (must contain model_mean and SE) and cld_wbm_ny (trt_CLD)
 
 plot_df_wbm_ny_model <- emm_trt_wbm_ny_df |>
   dplyr::mutate(
@@ -4777,7 +4873,7 @@ fig_ny_wbm_total_model <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(kg"~ha^{-1}*")"),
-    title   = "New York (Cornell + Farm Hub): total weed biomass by mowing ",
+    title   = "New York (Cornell + Farm Hub): total weed biomass by mowing",
     caption = "Bars show GLMM-predicted marginal means (kg ha\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -4798,8 +4894,9 @@ ggsave(
   dpi      = 300
 )
 
-
-# 1a) MODEL-PREDICTED MEANS (lb ac^-1) – EXTENSION FIGURE --------------
+# ----------------------------------------------------------------------
+# 1a) MODEL-PREDICTED MEANS (lb ac^-1)
+# ----------------------------------------------------------------------
 
 plot_df_wbm_ny_model_lb <- plot_df_wbm_ny_model |>
   dplyr::mutate(
@@ -4827,8 +4924,8 @@ fig_ny_wbm_total_model_lb <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(lb"~ac^{-1}*")"),
-    title   = "New York (Cornell + Farm Hub): total weed biomass by mowing ",
-    caption = "Bars show GLMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+    #title   = "New York (Cornell + Farm Hub): total weed biomass by mowing",
+    #caption = "Bars show GLMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -4848,8 +4945,60 @@ ggsave(
   dpi      = 300
 )
 
+# ----------------------------------------------------------------------
+# 1b) MODEL-PREDICTED MEANS (bu ac^-1)
+# ----------------------------------------------------------------------
 
-# 2) RAW MEANS (kg ha^-1) ----------------------------------------------
+plot_df_wbm_ny_model_bu <- plot_df_wbm_ny_model |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    SE_bu   = SE   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - SE_bu, 0),
+    ymax_bu = mean_bu + SE_bu
+  )
+
+fig_ny_wbm_total_model_bu <- ggplot(
+  plot_df_wbm_ny_model_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  geom_text(
+    aes(y = ymax_bu * 1.08, label = trt_CLD),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 6
+  ) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Weed~biomass~"(bu"~ac^{-1}*")"),
+    title   = NULL,
+    #caption = "Bars show GLMM-predicted marginal means (bu ac\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_wbm_total_model_bu
+
+ggsave(
+  filename = file.path(fig_dir_ny_total, "fig_ny_weed_biomass_total_model_bu_ac.png"),
+  plot     = fig_ny_wbm_total_model_bu,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+# ----------------------------------------------------------------------
+# 2) RAW MEANS (kg ha^-1)
+# ----------------------------------------------------------------------
 
 raw_ny_wbm_fig <- weed_biomass_ny |>
   dplyr::group_by(weed_trt) |>
@@ -4906,8 +5055,9 @@ ggsave(
   dpi      = 300
 )
 
-
-# 3) RAW MEANS (lb ac^-1) ----------------------------------------------
+# ----------------------------------------------------------------------
+# 3) RAW MEANS (lb ac^-1)
+# ----------------------------------------------------------------------
 
 raw_ny_wbm_fig_lb <- raw_ny_wbm_fig |>
   dplyr::mutate(
@@ -4935,7 +5085,7 @@ fig_ny_wbm_total_raw_lb <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~biomass~"(lb"~ac^{-1}*")"),
-    title   = "New York (Cornell + Farm Hub): total weed biomass by mowing ",
+    title   = "New York (Cornell + Farm Hub): total weed biomass by mowing",
     caption = "Bars show raw treatment means (lb ac\u207b\u00b9) \u00b1 SE; letters reuse GLMM-based Fisher\u2019s LSD groups (\u03b1 = 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -4951,6 +5101,57 @@ fig_ny_wbm_total_raw_lb
 ggsave(
   filename = file.path(fig_dir_ny_total, "fig_ny_weed_biomass_total_raw_lb_ac.png"),
   plot     = fig_ny_wbm_total_raw_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+# ----------------------------------------------------------------------
+# 3a) RAW MEANS (bu ac^-1)
+# ----------------------------------------------------------------------
+
+raw_ny_wbm_fig_bu <- raw_ny_wbm_fig |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    se_bu   = se   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - se_bu, 0),
+    ymax_bu = mean_bu + se_bu
+  )
+
+fig_ny_wbm_total_raw_bu <- ggplot(
+  raw_ny_wbm_fig_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  geom_text(
+    aes(y = ymax_bu * 1.08, label = trt_CLD),
+    vjust    = 0,
+    fontface = "bold",
+    size     = 6
+  ) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Weed~biomass~"(bu"~ac^{-1}*")"),
+    title   = "New York (Cornell + Farm Hub): total weed biomass by mowing",
+    caption = "Bars show raw treatment means (bu ac\u207b\u00b9) \u00b1 SE; letters reuse GLMM-based Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_wbm_total_raw_bu
+
+ggsave(
+  filename = file.path(fig_dir_ny_total, "fig_ny_weed_biomass_total_raw_bu_ac.png"),
+  plot     = fig_ny_wbm_total_raw_bu,
   width    = 9,
   height   = 5.5,
   dpi      = 300
