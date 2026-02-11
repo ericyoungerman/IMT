@@ -230,7 +230,6 @@ seed_plot_totals_ny |>
 # Exploratory
 
 ```{r}
-
 ## Exploratory ------------------------------------------------------------
 
 ## 1a) Ecobean (all five locations): seasonal weed seed density (seeds m^-2)
@@ -267,19 +266,19 @@ seed_box_eco <- seed_plot_totals_eco |>
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x = NULL,
-    y = "Seasonal weed seed density (seeds m\u207b\u00b2)",
+    y = "Weed seed rain (seeds m\u207b\u00b2)",
     title = "Ecobean: seasonal weed seed density by mowing treatment"
   ) +
-  theme(axis.text.x = element_text(size = 9),
-        strip.text  = element_text(face = "bold"))
+  theme(
+    axis.text.x = element_text(size = 9),
+    strip.text  = element_text(face = "bold")
+  )
 
 seed_box_eco
 
 
-
 ## 1b) New York only (Cornell + Farm Hub): seasonal weed seed density ----
 
-# Summary table by site-year × mowing ----------------------------------
 seed_box_ny <- seed_plot_totals_ny |>
   mutate(location = factor(location, levels = c("CU", "FH"))) |>
   ggplot(aes(x = weed_trt, y = seeds_per_m2_season, fill = weed_trt)) +
@@ -291,13 +290,54 @@ seed_box_ny <- seed_plot_totals_ny |>
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
     x = NULL,
-    y = "Seasonal weed seed density (seeds m\u207b\u00b2)",
+    y = "Weed seed rain (seeds m\u207b\u00b2)",
     title = "New York (Cornell + Farm Hub): seasonal weed seed density by mowing treatment"
   ) +
-  theme(axis.text.x = element_text(size = 9),
-        strip.text  = element_text(face = "bold"))
+  theme(
+    axis.text.x = element_text(size = 9),
+    strip.text  = element_text(face = "bold")
+  )
 
 seed_box_ny
+
+
+## 1c) New York only: seasonal weed seed density (seeds ft^-2) -----------
+
+## NY boxplot (ft^-2) with aligned theme + nicer facet labels ----------
+
+m2_to_ft2 <- 10.763910416709722  # 1 m^2 = 10.7639 ft^2
+
+seed_box_ny_ft2 <- seed_plot_totals_ny |>
+  mutate(
+    location = factor(location, levels = c("CU", "FH")),
+    seeds_per_ft2_season = seeds_per_m2_season / m2_to_ft2
+  ) |>
+  ggplot(aes(x = weed_trt, y = seeds_per_ft2_season, fill = weed_trt)) +
+  geom_boxplot(outlier.shape = NA, width = 0.55, color = "black") +
+  geom_jitter(width = 0.12, height = 0, alpha = 0.35, size = 1.6, color = "grey30") +
+  facet_grid(
+    year ~ location,
+    labeller = labeller(location = c(CU = "Cornell Musgrave Research Farm ", FH = "Hudson Valley Farm Hub"))
+  ) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_spaces) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x = NULL,
+    y = "Weed seed rain (seeds ft\u207b\u00b2)"
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+
+    strip.text       = element_text(face = "bold", size = 14),
+    strip.background = element_blank(),
+
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+  )
+
+seed_box_ny_ft2
 
 
 # Figure directories for weed seed figures ------------------------------
@@ -329,6 +369,18 @@ ggsave(
   height = 6,
   dpi    = 300
 )
+
+ggsave(
+  filename = file.path(
+    fig_dir_seed_ny,
+    "fig_weed_seed_density_box_ny_seeds_ft2.png"
+  ),
+  plot   = seed_box_ny_ft2,
+  width  = 12,
+  height = 6,
+  dpi    = 300
+)
+
 
 ```
 
@@ -1223,7 +1275,7 @@ fig_eco_seed_model_ft2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = "Weed seed rain by mowing treatment",
+    title   = NULL,
     #caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
@@ -1449,8 +1501,8 @@ fig_ny_seed_total_model_ft2 <- ggplot(
   labs(
     x       = NULL,
     y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = "Weed seed rain by mowing treatment",
-    caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
+    title   = NULL,
+    #caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
