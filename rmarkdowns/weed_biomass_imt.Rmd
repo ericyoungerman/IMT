@@ -4895,7 +4895,7 @@ ggsave(
 )
 
 # ----------------------------------------------------------------------
-# 1a) MODEL-PREDICTED MEANS (lb ac^-1)
+# 1a) MODEL-PREDICTED MEANS (lb/ac)
 # ----------------------------------------------------------------------
 
 plot_df_wbm_ny_model_lb <- plot_df_wbm_ny_model |>
@@ -4922,10 +4922,10 @@ fig_ny_wbm_total_model_lb <- ggplot(
   scale_x_discrete(labels = label_break_comma_cult) +
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
-    x       = NULL,
-    y       = expression(Weed~biomass~"(lb"~ac^{-1}*")"),
+    x = NULL,
+    y = "Weed biomass (lb/ac)"
     #title   = "New York (Cornell + Farm Hub): total weed biomass by mowing",
-    #caption = "Bars show GLMM-predicted marginal means (lb ac\u207b\u00b9) \u00b1 SE; letters denote Fisher\u2019s LSD groups (\u03b1 = 0.05)."
+    #caption = "Bars show GLMM-predicted marginal means (lb/ac) ± SE; letters denote Fisher’s LSD groups (α = 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -4944,6 +4944,7 @@ ggsave(
   height   = 5.5,
   dpi      = 300
 )
+
 
 # ----------------------------------------------------------------------
 # 1b) MODEL-PREDICTED MEANS (bu ac^-1)
