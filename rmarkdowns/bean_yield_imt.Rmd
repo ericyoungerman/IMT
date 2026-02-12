@@ -1826,12 +1826,17 @@ ggsave(
 ```{r}
 ## NY-only bean yield (kg ha^-1, adjusted to 14% moisture): figures -----
 
-kg_ha_to_lb_ac <- 0.892179  # same conversion
+# Conversions -----------------------------------------------------------
+kg_ha_to_lb_ac  <- 0.892179
+lb_per_bu_beans <- 60  # dry beans: 60 lb per bushel
+kg_ha_to_bu_ac  <- kg_ha_to_lb_ac / lb_per_bu_beans
 
 fig_dir_yield_ny <- here("analysis", "figs", "yield", "NY-only")
 dir.create(fig_dir_yield_ny, showWarnings = FALSE, recursive = TRUE)
 
-# 1) MODEL-PREDICTED MEANS (kg ha^-1) -----------------------------------
+# ----------------------------------------------------------------------
+# 1) MODEL-PREDICTED MEANS (kg ha^-1)
+# ----------------------------------------------------------------------
 # uses trt_summary_yield_ny from the NY-only summary-tables chunk
 
 plot_df_yield_ny_model <- trt_summary_yield_ny |>
@@ -1875,8 +1880,9 @@ ggsave(
   dpi      = 300
 )
 
-
-# 1a) MODEL-PREDICTED MEANS (lb ac^-1) ----------------------------------
+# ----------------------------------------------------------------------
+# 1a) MODEL-PREDICTED MEANS (lb ac^-1)
+# ----------------------------------------------------------------------
 
 plot_df_yield_ny_model_lb <- plot_df_yield_ny_model |>
   dplyr::mutate(
@@ -1919,8 +1925,54 @@ ggsave(
   dpi      = 300
 )
 
+# ----------------------------------------------------------------------
+# 1b) MODEL-PREDICTED MEANS (bu ac^-1)
+# ----------------------------------------------------------------------
 
-# 2) RAW MEANS (kg ha^-1) ----------------------------------------------
+plot_df_yield_ny_model_bu <- plot_df_yield_ny_model |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    SE_bu   = SE   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - SE_bu, 0),
+    ymax_bu = mean_bu + SE_bu
+  )
+
+fig_ny_yield_total_model_bu <- ggplot(
+  plot_df_yield_ny_model_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(bu"~ac^{-1}*" at 14% moisture)"),
+    #title   = "New York (Cornell + Farm Hub): bean yield by mowing treatment",
+    #caption = "Bars show LMM-predicted marginal means (bu ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_yield_total_model_bu
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_model_bu_ac.png"),
+  plot     = fig_ny_yield_total_model_bu,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+# ----------------------------------------------------------------------
+# 2) RAW MEANS (kg ha^-1)
+# ----------------------------------------------------------------------
 
 raw_ny_yield_fig <- bean_yield_ny |>
   dplyr::group_by(weed_trt) |>
@@ -1970,8 +2022,9 @@ ggsave(
   dpi      = 300
 )
 
-
-# 3) RAW MEANS (lb ac^-1) ----------------------------------------------
+# ----------------------------------------------------------------------
+# 3) RAW MEANS (lb ac^-1)
+# ----------------------------------------------------------------------
 
 raw_ny_yield_fig_lb <- raw_ny_yield_fig |>
   dplyr::mutate(
@@ -2009,6 +2062,51 @@ fig_ny_yield_total_raw_lb
 ggsave(
   filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_raw_lb_ac.png"),
   plot     = fig_ny_yield_total_raw_lb,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+# ----------------------------------------------------------------------
+# 3a) RAW MEANS (bu ac^-1)
+# ----------------------------------------------------------------------
+
+raw_ny_yield_fig_bu <- raw_ny_yield_fig |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    se_bu   = se   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - se_bu, 0),
+    ymax_bu = mean_bu + se_bu
+  )
+
+fig_ny_yield_total_raw_bu <- ggplot(
+  raw_ny_yield_fig_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x       = NULL,
+    y       = expression(Bean~yield~"(bu"~ac^{-1}*")"),
+    title   = "New York (Cornell + Farm Hub): bean yield by mowing treatment",
+    caption = "Bars show raw treatment means (bu ac\u207b\u00b9, adjusted to 14% moisture) \u00b1 SE."
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8)),
+    plot.title   = element_text(face = "bold"),
+    plot.caption = element_text(size = 9, hjust = 0)
+  )
+
+fig_ny_yield_total_raw_bu
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_raw_bu_ac.png"),
+  plot     = fig_ny_yield_total_raw_bu,
   width    = 9,
   height   = 5.5,
   dpi      = 300
@@ -2414,6 +2512,14 @@ fill_cols_sys_ny <- WB_brewer(
 ) |>
   setNames(sys_levels_ny)
 
+# Weed-free benchmark (NY-only) -----------------------------------------
+weedfree_mean_kg_ha <- bean_yield_sys_ny |>
+  dplyr::filter(weeds3 == "Weed-free") |>
+  dplyr::summarise(mu = mean(yield_kg_ha_adj14, na.rm = TRUE)) |>
+  dplyr::pull(mu)
+
+weedfree_mean_bu_ac <- weedfree_mean_kg_ha * kg_ha_to_bu_ac
+
 ```
 
 ### Model selection
@@ -2507,8 +2613,69 @@ sys_summary_yield_ny |>
 ```
 
 ### Figure
+
 ```{r}
-## NY-only: raw system-level means figure for HVFH ----------------------
+# ----------------------------------------------------------------------
+# 1b) MODEL-PREDICTED MEANS (bu/ac) + weed-free mean reference line
+# ----------------------------------------------------------------------
+
+# Weed-free benchmark (NY-only) -----------------------------------------
+weedfree_mean_kg_ha <- bean_yield_sys_ny |>
+  dplyr::filter(weeds3 == "Weed-free") |>
+  dplyr::summarise(mu = mean(yield_kg_ha_adj14, na.rm = TRUE)) |>
+  dplyr::pull(mu)
+
+weedfree_mean_bu_ac <- weedfree_mean_kg_ha * kg_ha_to_bu_ac
+wf_label <- sprintf("%.1f bu/ac", weedfree_mean_bu_ac)
+
+# Convert model-predicted mowing means to bu/ac --------------------------
+plot_df_yield_ny_model_bu <- plot_df_yield_ny_model |>
+  dplyr::mutate(
+    mean_bu = mean * kg_ha_to_bu_ac,
+    SE_bu   = SE   * kg_ha_to_bu_ac,
+    ymin_bu = pmax(mean_bu - SE_bu, 0),
+    ymax_bu = mean_bu + SE_bu
+  )
+
+fig_ny_yield_total_model_bu <- ggplot(
+  plot_df_yield_ny_model_bu,
+  aes(x = weed_trt, y = mean_bu, fill = weed_trt)
+) +
+  geom_col(width = 0.7, color = "black") +
+  geom_errorbar(aes(ymin = ymin_bu, ymax = ymax_bu), width = 0.14) +
+  geom_hline(yintercept = weedfree_mean_bu_ac, linetype = "dashed", linewidth = 0.8) +
+  annotate(
+    "text",
+    x = Inf, y = weedfree_mean_bu_ac,
+    label = wf_label,              # "31.6 bu/ac"
+    hjust = 1.02, vjust = -0.35,
+    size = 6, fontface = "bold"
+  ) +
+  scale_fill_manual(values = fill_cols, guide = "none") +
+  scale_x_discrete(labels = label_break_comma_cult) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    x = NULL,
+    y = "Bean yield (bu/ac at 14% moisture)"
+  ) +
+  theme_classic(base_size = 18) +
+  theme(
+    axis.text.x  = element_text(lineheight = 0.95, margin = margin(t = 8)),
+    axis.title.y = element_text(margin = margin(r = 8))
+  )
+
+fig_ny_yield_total_model_bu
+
+ggsave(
+  filename = file.path(fig_dir_yield_ny, "fig_ny_yield_total_model_bu_ac.png"),
+  plot     = fig_ny_yield_total_model_bu,
+  width    = 9,
+  height   = 5.5,
+  dpi      = 300
+)
+
+
+```
 
 # Start from your NY-only system dataset (already defined earlier)
 # bean_yield_sys_ny has: yield_kg_ha_adj14, system_trt, etc.
