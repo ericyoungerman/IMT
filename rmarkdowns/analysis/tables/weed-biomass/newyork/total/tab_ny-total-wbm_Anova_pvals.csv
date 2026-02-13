@@ -1,4 +1,4 @@
 Effect,P-value
 Mowing (weed_trt),<0.001
 Weediness (weeds),<0.001
-Mowing × Weediness (weed_trt × weeds),0.021
+Mowing × Weediness (weed_trt × weeds),<0.01

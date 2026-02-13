@@ -1478,7 +1478,7 @@ ggsave(
 )
 
 
-# 1a) MODEL-PREDICTED MEANS (seeds ft^-2 season^-1) ---------------------
+# 1a) MODEL-PREDICTED MEANS (seeds/ft²) ---------------------------------
 
 plot_df_seed_ny_model_ft2 <- plot_df_seed_ny_model_m2 |>
   dplyr::mutate(
@@ -1499,10 +1499,10 @@ fig_ny_seed_total_model_ft2 <- ggplot(
   scale_x_discrete(labels = label_break_spaces) +
   scale_y_continuous(labels = scales::label_comma()) +
   labs(
-    x       = NULL,
-    y       = expression(Weed~seed~rain~"(seeds"~ft^{-2}*")"),
-    title   = NULL,
-    #caption = "Bars show Tweedie GLMM-predicted marginal means (seeds ft\u207b\u00b2 season\u207b\u00b9) \u00b1 SE; letters indicate Fisher\u2019s LSD groupings (P > 0.05)."
+    x = NULL,
+    y = expression(Weed~seed~rain~"(seeds/ft"^2*")"),
+    title = NULL
+    #caption = "Bars show Tweedie GLMM-predicted marginal means (seeds/ft²) ± SE; letters indicate Fisher’s LSD groupings (α = 0.05)."
   ) +
   theme_classic(base_size = 18) +
   theme(
@@ -1521,6 +1521,7 @@ ggsave(
   height   = 5.5,
   dpi      = 300
 )
+
 
 
 # 2) RAW MEANS (seeds m^-2 season^-1) -----------------------------------

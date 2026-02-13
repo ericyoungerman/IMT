@@ -1,0 +1,9 @@
+weeds,weed_trt,model_mean,SE,ci_low,ci_high,int_CLD,raw_mean,raw_CLD
+Ambient weeds,No mowing,1459.9,522.4,724,2943.9,a,1911,a
+Ambient weeds,Early mowing,916.7,331,451.8,1860.3,b,1396.9,b
+Ambient weeds,Late mowing,859.9,309.5,424.6,1741.1,bc,1220.6,bc
+Ambient weeds,As-needed mowing,729.1,262.4,360.1,1476.2,c,980.8,c
+Surrogate weeds,No mowing,1572.8,558,784.7,3152.5,a,2169.1,a
+Surrogate weeds,Early mowing,1514.5,537.7,755.2,3037.3,a,2079.9,a
+Surrogate weeds,Late mowing,925.9,327.9,462.5,1853.8,b,1316.1,b
+Surrogate weeds,As-needed mowing,971.3,345.6,483.6,1950.8,b,1367.2,b
